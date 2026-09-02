@@ -70,7 +70,7 @@ def read_table_sentences(path, column=None):
     """
     ext = os.path.splitext(path)[1].lower()
     sents = []
-    if ext in (".xlsx", ".xls"):
+    if ext == ".xlsx":  # 仅 .xlsx;旧版 .xls 请先在 Excel/WPS 另存为 .xlsx
         import openpyxl
         wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
         for ws in wb.worksheets:

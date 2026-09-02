@@ -13,7 +13,7 @@
 | 模式 | 触发说法 | 行为 |
 |---|---|---|
 | 1 对话检索（默认） | 任何语料/检索/搭配/对比问题 | agent 生成 BCC 检索式 → `scripts/search.py` 执行 → 聊天中解读 |
-| 2 导入语料 | "我有新语料要导入" | `scripts/import_corpus.py` 转换 doc/docx 入库 |
+| 2 导入语料 | "我有新语料要导入" | `scripts/import_corpus.py` 转换 doc/docx/xlsx/md/txt 入库（Windows 上旧版 .doc/.xls 会被跳过并提示先转格式） |
 | 3 完整界面 | "打开完整界面" | `scripts/launch_gui.py` 拉起原 Streamlit 界面（兜底） |
 
 ## 开发

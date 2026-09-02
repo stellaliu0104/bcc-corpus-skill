@@ -9,7 +9,7 @@
   python tests/run_tests.py --suite translate --llm  # L2 + 本地 LLM 预验证
                                                      #   需环境变量 LLM_BASE_URL/LLM_API_KEY/LLM_MODEL
 
-退出码: 失败用例数(0 = 全绿)。
+退出码: 0 = 全绿, 1 = 存在失败用例。
 """
 
 import json

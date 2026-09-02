@@ -23,7 +23,8 @@ sys.path.insert(0, HERE)
 
 from preprocess import process_file  # noqa: E402 (vendored,同目录)
 
-EXTS = (".doc", ".docx", ".xlsx", ".xls", ".md", ".txt")
+# 注:.xls(Excel 97-2003) openpyxl 不支持,诚实排除;用户请先另存为 .xlsx
+EXTS = (".doc", ".docx", ".xlsx", ".md", ".txt")
 OUT_DIR = os.path.join(SKILL_ROOT, "data", "Corpus")
 
 

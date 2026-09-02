@@ -53,6 +53,7 @@ def main():
         except Exception:  # noqa: BLE001
             if proc.poll() is not None:
                 break
+    proc.terminate()  # 失败退出前清理子进程,避免遗留孤儿 streamlit
     print("启动失败:请把以下输出发给维护者")
     sys.exit(1)
 
