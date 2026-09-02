@@ -94,18 +94,24 @@ def err(msg, hint=None):
     sys.exit(1)
 
 
-# ── 结果导出(数据库式呈现:全量命中+上下文) ─────────────────────────
+# ── 结果导出(数据库式呈现:交互式 HTML 为默认,另支持 xlsx/csv) ───────
 
 def _export_dir():
-    """默认导出到桌面 bcc-results/(师门最容易找),不可写则退回技能 results/。"""
-    desk = os.path.expanduser("~/Desktop/bcc-results")
+    """存储目录:读技能配置(data/config.json 的 results_dir)。
+
+    未配置时不擅自选桌面等位置——返回 None,由调用方提示 agent 引导用户
+    先运行 config.py --results-dir 选择目录(或本次用 --out 指定)。
+    """
+    cfg_path = os.path.join(HERE, "..", "data", "config.json")
     try:
-        os.makedirs(desk, exist_ok=True)
-        return desk
-    except OSError:
-        fallback = os.path.join(HERE, "..", "results")
-        os.makedirs(fallback, exist_ok=True)
-        return fallback
+        with open(cfg_path, encoding="utf-8") as f:
+            d = os.path.expanduser(json.load(f).get("results_dir") or "")
+        if d:
+            os.makedirs(d, exist_ok=True)
+            return d
+    except (OSError, json.JSONDecodeError, ValueError):
+        pass
+    return None
 
 
 def _rows_of(out):
@@ -239,7 +245,13 @@ def do_export(fmt, out, explicit_path):
     stem = "".join(c if c.isalnum() or "\u4e00" <= c <= "\u9fff" else "_"
                    for c in str(out.get("query") or out.get("type")))[:40]
     fname = f"{time.strftime('%Y%m%d-%H%M%S')}-{stem}{ext}"
-    path = explicit_path or os.path.join(_export_dir(), fname)
+    if explicit_path:
+        path = explicit_path
+    else:
+        base = _export_dir()
+        if not base:
+            return None  # 未配置存储目录:由调用方引导,不擅自落盘
+        path = os.path.join(base, fname)
     if not os.path.isabs(path):
         path = os.path.abspath(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -256,9 +268,10 @@ def main():
                         metavar="NAME=词1 词2", help="预定义词表,可多次")
     common.add_argument("--pretty", action="store_true", default=argparse.SUPPRESS,
                         help="美化输出")
-    common.add_argument("--export", choices=["xlsx", "html", "csv"],
-                        default=argparse.SUPPRESS, metavar="FMT",
-                        help="导出全量结果文件(xlsx/html/csv)")
+    common.add_argument("--export", choices=["html", "xlsx", "csv"],
+                        nargs="?", const="html", default=argparse.SUPPRESS,
+                        metavar="FMT",
+                        help="导出全量结果文件;不带值默认 html(交互式,可搜索/排序)")
     common.add_argument("--out", default=argparse.SUPPRESS, metavar="PATH",
                         help="导出文件路径(默认桌面 bcc-results/)")
 
@@ -375,10 +388,17 @@ def main():
 
     if export:
         try:
-            out["export_path"] = do_export(export, out, getattr(args, "out", None))
-            out["export_note"] = f"全量结果已导出: {out['export_path']}"
+            exp_path = do_export(export, out, getattr(args, "out", None))
         except Exception as e:  # noqa: BLE001
-            out["export_error"] = f"导出失败: {e}(xlsx 需要 openpyxl,html/csv 无依赖)"
+            exp_path = None
+            out["export_hint"] = f"导出失败: {e}(xlsx 需 openpyxl;html/csv 无依赖)"
+        if exp_path:
+            out["export_path"] = exp_path
+            out["export_note"] = f"全量结果已导出: {exp_path}"
+        elif "export_hint" not in out:
+            out["export_hint"] = ("尚未配置存储目录。请询问用户想把检索结果存在哪个文件夹,"
+                                  "然后运行 python scripts/config.py --results-dir <路径> 保存;"
+                                  "或本次用 --out 指定完整文件路径。")
 
     print(json.dumps(out, ensure_ascii=False,
                      indent=2 if getattr(args, "pretty", False) else None))

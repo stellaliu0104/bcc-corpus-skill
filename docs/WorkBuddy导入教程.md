@@ -7,16 +7,14 @@
 
 ## 第一步：组装技能包（只需维护者做一次）
 
-技能代码在仓库 `skill/bcc-corpus/`，但语料不入库，需要手动组装一次完整包。
+技能代码在仓库 `skill/bcc-corpus/`，但语料不入库，需要组装一次完整包。
 
-在本机终端执行（把语料复制进技能目录并打包）：
+在仓库根目录执行一条命令（脚本自动拷语料、排除 venv/索引/配置、**中文文件名带 UTF-8 标志防 Windows 乱码**）：
 
 ```bash
-cd "/Users/I765069/Documents/300-Coding/302-projects/BCC document/bcc-corpus-skill/skill"
-mkdir -p bcc-corpus/data/Corpus
-cp /Users/I765069/Documents/300-Coding/302-projects/bcc-ai-tool-mac/data/Corpus/*.txt bcc-corpus/data/Corpus/
-zip -r bcc-corpus.zip bcc-corpus -x "bcc-corpus/venv/*" -x "*__pycache__*"
-ls -lh bcc-corpus.zip   # 期待 25-35M 左右
+cd "/Users/I765069/Documents/300-Coding/302-projects/BCC document/bcc-corpus-skill"
+python3 tools/package.py
+# 输出: 打包完成: skill/bcc-corpus.zip (约 801 个条目, 18M)
 ```
 
 组装完的 `bcc-corpus.zip`（约 25-30M，含 55M 语料压缩后）就是发给师门的安装包。
