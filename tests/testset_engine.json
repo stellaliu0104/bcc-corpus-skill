@@ -1,0 +1,60 @@
+{
+  "suite": "engine",
+  "comment": "L1 引擎层:给定检索式,断言 CLI 输出结构。断言全部为结构性/方向性,不绑定具体语料数字。",
+  "cases": [
+    {
+      "id": "freq_basic_adj_de_n",
+      "args": ["freq", "a的n", "--top", "10"],
+      "expect": { "ok": true, "type": "Freq", "min_total": 1, "min_records": 1 }
+    },
+    {
+      "id": "freq_hen_adverb",
+      "args": ["freq", "很d"],
+      "expect": { "ok": true, "min_total": 1 }
+    },
+    {
+      "id": "freq_count_word",
+      "args": ["count", "的"],
+      "expect": { "ok": true, "type": "Count", "min_total": 1 }
+    },
+    {
+      "id": "context_common_word",
+      "args": ["context", "居然", "--number", "5"],
+      "expect": { "ok": true, "type": "Context", "min_records": 1, "record_keys": ["left", "keyword", "right"] }
+    },
+    {
+      "id": "context_star_wildcard",
+      "args": ["context", "如果*就", "--number", "5"],
+      "expect": { "ok": true, "record_keys": ["left", "keyword", "right"] },
+      "note": "口传语料可能 0 命中,只验证不崩溃且结构正确"
+    },
+    {
+      "id": "compare_hen_vs_feichang",
+      "args": ["compare", "很a", "非常a", "--top", "10"],
+      "expect": { "ok": true, "type": "Compare", "items_length": 2, "item_keys": ["label", "query", "count_total", "top"] }
+    },
+    {
+      "id": "wordlist_inline",
+      "args": ["freq", "很(~){$1=[freq_adv]}", "--wordlist", "freq_adv=经常 常常 偶尔"],
+      "expect": { "ok": true }
+    },
+    {
+      "id": "malformed_query_graceful",
+      "args": ["freq", "a的n{$1=[x"],
+      "expect": { "json_valid": true, "ok_in": [true, false] },
+      "note": "坏语法必须优雅返回 JSON,不允许裸 traceback"
+    },
+    {
+      "id": "undefined_wordlist_graceful",
+      "args": ["freq", "很(~){$1=[no_such_list]}"],
+      "expect": { "json_valid": true, "ok_in": [true, false] },
+      "note": "未定义词表不允许裸 traceback"
+    },
+    {
+      "id": "missing_corpus_graceful",
+      "args": ["freq", "的", "--corpus", "/tmp/__no_such_corpus__"],
+      "expect": { "json_valid": true, "ok": false },
+      "note": "语料缺失必须返回 ok:false + hint"
+    }
+  ]
+}
