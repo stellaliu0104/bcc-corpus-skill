@@ -17,9 +17,18 @@ description: BCC 语料库检索技能。当用户提出语料检索、词汇/�
 
 **硬性流程，逐步执行，不得跳步：**
 
+0. **选子命令**（对照下表，拿不准时两个都可先 count 试探）：
+
+| 用户问的是… | 子命令 |
+|---|---|
+| 多少/几种/最高频/搭配分布 | `freq` |
+| 例句/用例/语境/什么样子 | `context` |
+| A 和 B 的差别/分工/一样吗 | `compare`（两条检索式） |
+| 只要一个总数 | `count` |
+
 1. **读语法**：生成检索式之前，必须先读 `references/bcc_syntax.md` 和 `references/examples.md`（本技能目录内）。
-2. **映射检索式**：把用户问题对照 examples.md 的同型例子**照搬替换**（改词/词性即可）；找不到同型才基于语法自己组合。对比类问题（"A 和 B 的差别/分工"）→ 用 `compare` 子命令或两条查询。
-3. **亮出检索式**：先用一行告诉用户"我将用检索式 `X` 来查"，再执行。检索式复杂或拿不准时，请用户确认后再执行。
+2. **映射检索式**：把用户问题对照 examples.md 的同型例子**照搬替换**（改词/词性即可）；找不到同型才基于语法自己组合。对比类问题（"A 和 B 的差别/分工"）→ 用 `compare`（两条检索式）。
+3. **亮出完整命令**：先用一行告诉用户你将执行的完整命令（含子命令与参数），例如 `python scripts/search.py freq "a的n" --top 30`，再执行。检索式复杂或拿不准时，等用户确认后再执行。
 4. **执行**（示例）：
    ```
    python scripts/search.py freq "a的n" --top 30
@@ -30,20 +39,20 @@ description: BCC 语料库检索技能。当用户提出语料检索、词汇/�
    输出是 JSON（含 total/records/elapsed_ms）。
 5. **解读**（见下方输出规范）。
 
-**错误重试环**：返回 `ok:false` 或 total=0 时——对照 bcc_syntax.md 检查检索式（90% 是 `*`/`~` 混用或条件语法错）→ 修正重跑，**最多重试 2 轮**。仍失败则如实告诉用户，附上语法速查要点，请用户手写检索式（兜底出口）。**严禁编造检索结果。**
+**错误重试环**：返回 `ok:false` 或命中为 0 时——注意 `compare` 的结果没有顶层 total，要看 `items` 里每条的 `count_total`。对照 bcc_syntax.md 检查检索式（90% 是 `*`/`~` 混用或条件语法错）→ 修正重跑，**最多重试 2 轮**。仍失败则如实告诉用户，附上语法速查要点，请用户手写检索式（兜底出口）。**严禁编造检索结果。**
 
 ## 模式 2：导入语料
 
 用户说"我有新语料要导入/加入语料库"时：
-1. 问清文件位置（文件夹路径），确认是 .doc/.docx/.xlsx/.md/.txt
+1. 问清文件位置（文件夹路径），确认是 .doc/.docx/.xlsx/.md/.txt。**注意：Windows 上旧版 .doc 会被跳过**，提前告知用户先用 Word/WPS 批量另存为 .docx
 2. 运行 `python scripts/import_corpus.py --source <文件夹>`
-3. 成功后报告 JSON 里的 imported/sentences/corpus_files_total；如需让改动立即生效可加 `--rebuild`
+3. 成功后报告 JSON 里的 imported/sentences/corpus_files_total/skipped_legacy_doc；如需让改动立即生效可加 `--rebuild`
 
 ## 模式 3：打开完整界面（兜底）
 
 用户说"打开完整界面/原来的界面/Streamlit"时：
 1. 若脚本报 GUI 依赖未安装 → 先运行 `python scripts/setup.py --full`（约 5 分钟）
-2. 运行 `python scripts/launch_gui.py`，浏览器打开后告知用户地址（默认 http://localhost:8501）。界面卡死/报错时检查端口占用
+2. 运行 `python scripts/launch_gui.py`，浏览器打开后告知用户地址（默认 http://localhost:8501；端口被占用时改用 `--port 8502`）
 
 ## 解读输出规范（面向文科用户）
 
