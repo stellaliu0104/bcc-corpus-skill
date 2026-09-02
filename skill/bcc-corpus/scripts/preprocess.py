@@ -64,7 +64,7 @@ def read_text_file(path):
 def read_table_sentences(path, column=None):
     """从 Excel / Markdown 表格里抽取句子列。
 
-    - .xlsx:读所有单元格中较长的文本(或指定列名 column)
+    - .xlsx:读所有单元格中较长的文本;指定 column(表头列名)时只读该列
     - .md:抽取表格行里的中文长文本
     返回句子列表。
     """
@@ -74,13 +74,20 @@ def read_table_sentences(path, column=None):
         import openpyxl
         wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
         for ws in wb.worksheets:
-            header = None
+            col_idx = None
             for i, row in enumerate(ws.iter_rows(values_only=True)):
                 if i == 0:
                     header = [str(c) if c is not None else "" for c in row]
-                    if column and column in header:
-                        continue
-                for cell in row:
+                    if column:
+                        col_idx = header.index(column) if column in header else None
+                        if col_idx is not None:
+                            continue  # 表头行本身不作为语料
+                if col_idx is not None:
+                    cell = row[col_idx] if col_idx < len(row) else None
+                    cells = [cell]
+                else:
+                    cells = row
+                for cell in cells:
                     if isinstance(cell, str) and len(cell.strip()) >= 4:
                         sents.append(cell.strip())
     elif ext == ".md":

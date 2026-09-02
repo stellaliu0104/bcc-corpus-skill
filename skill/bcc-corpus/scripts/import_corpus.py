@@ -25,7 +25,6 @@ from preprocess import process_file  # noqa: E402 (vendored,同目录)
 
 EXTS = (".doc", ".docx", ".xlsx", ".xls", ".md", ".txt")
 OUT_DIR = os.path.join(SKILL_ROOT, "data", "Corpus")
-MAP_DIR = os.path.join(SKILL_ROOT, "data", "_maps")
 
 
 def main():

@@ -64,6 +64,7 @@ def make_engine(corpus_abs):
     """LangSC 的 BCC 只接受相对路径(内部拼 './' 前缀),因此 chdir 到语料父目录。
 
     索引目录(CorpusIdx)与语料目录同级,这样可复用已有索引,避免每次重建。
+    注意:chdir 有进程级副作用,本函数仅适用于一次性 CLI 进程,勿嵌入常驻服务。
     """
     parent = os.path.dirname(corpus_abs)
     name = os.path.basename(corpus_abs)
@@ -136,8 +137,13 @@ def main():
 
     t0 = time.time()
     try:
+        wordlists = parse_wordlists(getattr(args, "wordlist", None))
+    except ValueError as e:
+        err(str(e), '用法: --wordlist "name=词1 词2"(等号分隔,空格分词),如 '
+                    '"freq_adv=经常 常常 偶尔"')
+    try:
         eng = make_engine(corpus)
-        for name, words in parse_wordlists(getattr(args, "wordlist", None)).items():
+        for name, words in wordlists.items():
             eng.define_wordlist(name, words)
     except Exception as e:  # noqa: BLE001
         err(f"引擎初始化失败: {e}",

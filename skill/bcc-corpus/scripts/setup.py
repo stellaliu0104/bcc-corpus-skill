@@ -99,10 +99,20 @@ def install(full):
         subprocess.run([py, "-m", "venv", VENV], check=True)
     deps = CLI_DEPS + (GUI_DEPS if full else [])
     print(f"[setup] 安装依赖({len(deps)} 个包,约 2-8 分钟) ...", flush=True)
-    subprocess.run([venv_python(), "-m", "pip", "install", "-q", "--upgrade",
-                    "pip"], check=True)
-    subprocess.run([venv_python(), "-m", "pip", "install", "-q", *deps],
-                   check=True)
+    try:
+        subprocess.run([venv_python(), "-m", "pip", "install", "-q",
+                        "--upgrade", "pip"], check=True)
+        subprocess.run([venv_python(), "-m", "pip", "install", "-q", *deps],
+                       check=True)
+    except subprocess.CalledProcessError as e:
+        print(json.dumps({
+            "ok": False, "stage": "pip_install",
+            "error": f"依赖安装失败(退出码 {e.returncode})",
+            "hint": "常见原因:网络不通/代理拦截/Python 版本无 wheel。"
+                    "请检查网络后重跑;仍失败请把本窗口全部输出发给维护者,"
+                    "或手动执行: " + venv_python() + " -m pip install -U pip",
+        }, ensure_ascii=False))
+        sys.exit(1)
     st = check()
     print(json.dumps({"ok": True, **({"warning": warning} if warning else {}),
                       **st}, ensure_ascii=False, indent=2))
