@@ -16,3 +16,4 @@ skill/bcc-corpus/app/venv/
 # 系统
 .DS_Store
 *.log
+*.zip
