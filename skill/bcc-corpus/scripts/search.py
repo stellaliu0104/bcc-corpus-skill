@@ -48,7 +48,7 @@ def find_corpus(explicit):
             return os.path.abspath(explicit)
         return None  # 显式但无效 → 由调用方报错
     for c in [os.environ.get("BCC_CORPUS"),
-              os.path.join(HERE, "data", "Corpus"),
+              os.path.join(HERE, "..", "data", "Corpus"),
               # 开发/测试回退: 本仓库与 bcc-ai-tool-* 同级时直接复用其语料与索引
               # (scripts → bcc-corpus → skill → bcc-corpus-skill → BCC document → 302-projects)
               os.path.abspath(os.path.join(HERE, "..", "..", "..", "..", "..",

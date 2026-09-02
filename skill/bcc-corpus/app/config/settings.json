@@ -1,0 +1,6 @@
+{
+  "provider": "openai-compatible",
+  "api_key": "",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "base_url": "https://api.siliconflow.cn/v1"
+}

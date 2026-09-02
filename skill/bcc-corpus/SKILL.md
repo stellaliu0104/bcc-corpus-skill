@@ -35,13 +35,15 @@ description: BCC 语料库检索技能。当用户提出语料检索、词汇/�
 ## 模式 2：导入语料
 
 用户说"我有新语料要导入/加入语料库"时：
-1. 问清文件位置（文件夹路径），确认是 .doc/.docx/.txt
+1. 问清文件位置（文件夹路径），确认是 .doc/.docx/.xlsx/.md/.txt
 2. 运行 `python scripts/import_corpus.py --source <文件夹>`
-3. 成功后报告：新增多少篇、总篇数；提醒新语料已可检索
+3. 成功后报告 JSON 里的 imported/sentences/corpus_files_total；如需让改动立即生效可加 `--rebuild`
 
 ## 模式 3：打开完整界面（兜底）
 
-用户说"打开完整界面/原来的界面/Streamlit"时：运行 `python scripts/launch_gui.py`，浏览器打开后告知用户地址（默认 http://localhost:8501）。界面卡死/报错时检查端口占用。
+用户说"打开完整界面/原来的界面/Streamlit"时：
+1. 若脚本报 GUI 依赖未安装 → 先运行 `python scripts/setup.py --full`（约 5 分钟）
+2. 运行 `python scripts/launch_gui.py`，浏览器打开后告知用户地址（默认 http://localhost:8501）。界面卡死/报错时检查端口占用
 
 ## 解读输出规范（面向文科用户）
 
