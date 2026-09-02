@@ -50,10 +50,23 @@ skill/bcc-corpus/
 - [x] commit 3: search.py CLI
 - [x] commit 4: SKILL.md + references
 - [x] commit 5: 测试集 + runner
-- [x] commit 6+: 实测修复循环
-- [x] commit 7: setup/import/launch（模式2/3）
-- [x] commit 8: L2 翻译层 GLM 预验证
-- [ ] GitHub push（阻塞：token 失效）
+- [x] commit 6+: 实测修复循环（argparse 父解析器、语料目录语义、corpus 回退层级）
+- [x] commit 7: setup/import/launch（模式2/3）+ vendored app（HTTP 200 实测）
+- [x] commit 8: L2 翻译层 GLM-5.3 预验证 → 16/16
+- [x] 跨模型审查循环：gpt-5 两轮（R1"需修改后发布"→ P0×3/P1×9 全部修复 → R2"**可发布**"）
+- [ ] GitHub push（阻塞：本机 github.com token 失效，待 `gh auth login -h github.com`）
 - [ ] WorkBuddy 真机导入验证（用户侧）
-- [ ] HY3 翻译准确率实测（用户侧）
-- [ ] 分发 zip 组装脚本
+- [ ] HY3 翻译准确率实测（用户侧，用 tests/testset_translate.json --llm）
+- [ ] 分发 zip 组装脚本（data/Corpus 55M + 可选索引 293M）
+
+## 实测关键指标（2026-09-02 晚）
+
+- 索引冷加载：**0.2s**（复用 CorpusIdx，路径 B 速度顾虑消除）
+- L1 引擎层：12/12（含错误路径与数值完整性断言）
+- L2 翻译层（GLM-5.3 当翻译器）：16/16；**运行间方差 14~16/16**（temperature=0 仍有思考路径抖动），后续应引入多次运行稳定性指标
+- 模式 2 导入：doc/docx/xlsx/md/txt → GBK+标注 ✓（Windows 旧 .doc/.xls 诚实跳过）
+- 模式 3 GUI：HTTP 200 ✓
+
+## 遗留技术疑点
+
+- BCC `NOT` 复合语义存疑：`n们`=2763 但 `n们 NOT r们`=0，需查 LangSC 文档/DLL 行为后再加 NOT 翻译测试用例
