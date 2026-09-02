@@ -15,27 +15,30 @@ import time
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SKILL_ROOT = os.path.dirname(HERE)
-APP_DIR = os.path.join(SKILL_ROOT, "app")
-VENV_PY = os.path.join(SKILL_ROOT, "venv", "bin", "python")
+sys.path.insert(0, HERE)
+
+from _env import venv_python  # noqa: E402 (跨平台 venv 路径)
+
+APP_DIR = os.path.join(os.path.dirname(HERE), "app")
 
 
 def main():
+    venv_py = venv_python()
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8501)
     args = ap.parse_args()
 
-    if not os.path.isfile(VENV_PY):
+    if not os.path.isfile(venv_py):
         print("环境未就绪:请先运行 python scripts/setup.py --full")
         sys.exit(1)
-    r = subprocess.run([VENV_PY, "-c", "import streamlit"], capture_output=True)
+    r = subprocess.run([venv_py, "-c", "import streamlit"], capture_output=True)
     if r.returncode != 0:
         print("GUI 依赖未安装:请先运行 python scripts/setup.py --full")
         sys.exit(1)
 
     url = f"http://localhost:{args.port}"
     proc = subprocess.Popen(
-        [VENV_PY, "-m", "streamlit", "run", "app.py",
+        [venv_py, "-m", "streamlit", "run", "app.py",
          "--server.port", str(args.port), "--server.headless", "true"],
         cwd=APP_DIR,
     )
