@@ -2,21 +2,142 @@
   "suite": "translate",
   "comment": "L2 翻译层:自然语言问题 → 预期 BCC 检索式(模式: single|compare)。用于 WorkBuddy/HY3 真机验证;可选 --llm 做离线模型预验证。",
   "cases": [
-    { "id": "t01", "mode": "single", "question": "'的'前面最常出现哪些形容词?", "expected": "a的n", "must_not": ["~"] },
-    { "id": "t02", "mode": "single", "question": "'很'后面能接哪些副词?", "expected": "很d" },
-    { "id": "t03", "mode": "compare", "question": "'很'和'非常'修饰形容词有什么差别?", "expected": ["很a", "非常a"] },
-    { "id": "t04", "mode": "compare", "question": "'曾经'和'已经'的用法怎么分工?", "expected": ["曾经d", "已经d"] },
-    { "id": "t05", "mode": "single", "question": "给我一些'居然'的真实用例", "expected": "居然" },
-    { "id": "t06", "mode": "single", "question": "找'洗'和'澡'分开说的例子,比如洗了个澡", "expected": "洗*澡", "must_not": ["洗~澡", "洗.澡"] },
-    { "id": "t07", "mode": "single", "question": "'如果'后面隔几个词再出现'就'的句子", "expected": "如果*就", "must_not": ["如果~就"] },
-    { "id": "t08", "mode": "single", "question": "'把'字句里'把'后面一般接什么名词?", "expected": "把n*v" },
-    { "id": "t09", "mode": "single", "question": "'很'能修饰哪些频率副词?", "expected": "很(~){$1=[经常 常常 偶尔 时常 往往]}", "must_not": ["很d"] },
-    { "id": "t10", "mode": "single", "question": "'太'后面接心理动词的例子", "expected": "太(~){$1=[喜欢 担心 害怕 后悔 失望]}", "must_not": ["太v"] },
-    { "id": "t11", "mode": "compare", "question": "名词前面用'的'还是'地'?对比一下", "expected": ["a的n", "a地v"] },
-    { "id": "t12", "mode": "single", "question": "'们'前面都有哪些代词?", "expected": "r们" },
-    { "id": "t13", "mode": "single", "question": "双音节的形容词加'的'加名词的组合", "expected": "(a)的n{len($1)=2}" },
-    { "id": "t14", "mode": "compare", "question": "'二'和'两'跟量词搭配有什么区别?", "expected": ["二m", "两m"] },
-    { "id": "t15", "mode": "single", "question": "'被'字句都有哪些?", "expected": "被n*v" },
-    { "id": "t16", "mode": "single", "question": "同一个动词重复的'V一V'格式", "expected": "(v)一(v){$1=$2}" }
+    {
+      "id": "t01",
+      "mode": "single",
+      "question": "'的'前面最常出现哪些形容词?",
+      "expected": "a的n",
+      "must_not": [
+        "~"
+      ]
+    },
+    {
+      "id": "t02",
+      "mode": "single",
+      "question": "'很'后面能接哪些副词?",
+      "expected": "很d"
+    },
+    {
+      "id": "t03",
+      "mode": "compare",
+      "question": "'很'和'非常'修饰形容词有什么差别?",
+      "expected": [
+        "很a",
+        "非常a"
+      ]
+    },
+    {
+      "id": "t04",
+      "mode": "compare",
+      "question": "'曾经'和'已经'的用法怎么分工?",
+      "expected": [
+        "曾经d",
+        "已经d"
+      ]
+    },
+    {
+      "id": "t05",
+      "mode": "single",
+      "question": "给我一些'居然'的真实用例",
+      "expected": "居然"
+    },
+    {
+      "id": "t06",
+      "mode": "single",
+      "question": "找'洗'和'澡'分开说的例子,比如洗了个澡",
+      "expected": "洗*澡",
+      "must_not": [
+        "洗~澡",
+        "洗.澡"
+      ]
+    },
+    {
+      "id": "t07",
+      "mode": "single",
+      "question": "'如果'后面隔几个词再出现'就'的句子",
+      "expected": "如果*就",
+      "must_not": [
+        "如果~就"
+      ]
+    },
+    {
+      "id": "t08",
+      "mode": "single",
+      "question": "'把'字句里'把'后面一般接什么名词?",
+      "expected": "把n*v"
+    },
+    {
+      "id": "t09",
+      "mode": "single",
+      "question": "'很'能修饰哪些频率副词?",
+      "must_not": [
+        "很d"
+      ],
+      "check": "wordlist_superset",
+      "core_words": [
+        "经常",
+        "常常",
+        "偶尔"
+      ],
+      "expected_hint": "很(~){$1=[经常 常常 偶尔 时常 往往]}"
+    },
+    {
+      "id": "t10",
+      "mode": "single",
+      "question": "'太'后面接心理动词的例子",
+      "must_not": [
+        "太v"
+      ],
+      "check": "wordlist_superset",
+      "core_words": [
+        "喜欢",
+        "担心",
+        "害怕"
+      ],
+      "expected_hint": "太(~){$1=[喜欢 担心 害怕 后悔 失望]}"
+    },
+    {
+      "id": "t11",
+      "mode": "compare",
+      "question": "名词前面用'的'还是'地'?对比一下",
+      "expected": [
+        "a的n",
+        "a地v"
+      ]
+    },
+    {
+      "id": "t12",
+      "mode": "single",
+      "question": "'们'前面都有哪些代词?",
+      "expected": "r们"
+    },
+    {
+      "id": "t13",
+      "mode": "single",
+      "question": "双音节的形容词加'的'加名词的组合",
+      "expected": "(a)的n{len($1)=2}"
+    },
+    {
+      "id": "t14",
+      "mode": "compare",
+      "question": "'二'和'两'跟量词搭配有什么区别?",
+      "expected": [
+        "二m",
+        "两m"
+      ],
+      "note": "数词用 m;examples.md 已补充示例"
+    },
+    {
+      "id": "t15",
+      "mode": "single",
+      "question": "'被'字句都有哪些?",
+      "expected": "被n*v"
+    },
+    {
+      "id": "t16",
+      "mode": "single",
+      "question": "同一个动词重复的'V一V'格式",
+      "expected": "(v)一(v){$1=$2}"
+    }
   ]
 }

@@ -97,13 +97,17 @@ PROMPT_TMPL = """你是 BCC 语料库检索助手。用户用自然语言描述�
 
 {syntax}
 
+以下是"研究问题→检索式"对照示例库(优先照搬同型例子,替换词/词性):
+
+{examples}
+
 【重要规则】
 1. 跨词通配用 `*`(任意词数、不跨标点),而非 `~`(恰好一个词)。
-2. 问题涉及「A 与 B 的对比/差别/区别/比较」时,输出两行,格式:
+2. 问题涉及「A 与 B 的对比/差别/区别/比较/分工」时,输出三行:
    COMPARE
-   [标签A] 检索式A
-   [标签B] 检索式B
-3. 单条查询只输出一行检索式,无解释。
+   [A] 检索式A
+   [B] 检索式B
+3. 单条查询只输出一行检索式本身——不要加 Freq()/Context() 等操作后缀,不要加解释。
 4. 查"某类词"优先用词表条件,如 `很(~){{$1=[经常 常常 偶尔 时常 往往]}}`。
 5. 词性 v 分不出心理动词等语义小类,此类需求用词表。
 
@@ -111,29 +115,54 @@ PROMPT_TMPL = """你是 BCC 语料库检索助手。用户用自然语言描述�
 你的输出:"""
 
 
-def translate_with_llm(question, syntax):
+def translate_with_llm(question, syntax, examples=""):
     base = os.environ.get("LLM_BASE_URL", "").rstrip("/")
     key = os.environ.get("LLM_API_KEY", "")
     model = os.environ.get("LLM_MODEL", "")
+    style = os.environ.get("LLM_API_STYLE", "openai")  # openai | anthropic
     if not (base and key and model):
         return None, "未配置 LLM_BASE_URL/LLM_API_KEY/LLM_MODEL"
     import urllib.request
-    body = json.dumps({
-        "model": model,
-        "messages": [
-            {"role": "system", "content": PROMPT_TMPL.format(syntax=syntax, question=question)},
-            {"role": "user", "content": question},
-        ],
-        "temperature": 0.0, "max_tokens": 300,
-    }).encode()
-    req = urllib.request.Request(
-        base + "/chat/completions", data=body,
-        headers={"Content-Type": "application/json",
-                 "Authorization": f"Bearer {key}"},
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        data = json.loads(resp.read())
-    text = data["choices"][0]["message"]["content"].strip()
+    system = PROMPT_TMPL.format(syntax=syntax, examples=examples, question=question)
+    # 思考型模型的 thinking 会消耗 token 预算,300 会导致正文为空
+    max_tokens = int(os.environ.get("LLM_MAX_TOKENS", "2000"))
+    if style == "anthropic":
+        req = urllib.request.Request(
+            base + "/v1/messages",
+            data=json.dumps({
+                "model": model, "max_tokens": max_tokens, "temperature": 0.0,
+                "system": system,
+                "messages": [{"role": "user", "content": question}],
+            }).encode(),
+            headers={"Content-Type": "application/json",
+                     "x-api-key": key, "anthropic-version": "2023-06-01"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        text = "".join(b.get("text", "") for b in data.get("content", [])
+                       if b.get("type") == "text").strip()
+    else:
+        req = urllib.request.Request(
+            base + "/chat/completions",
+            data=json.dumps({
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": question},
+                ],
+                "temperature": 0.0, "max_tokens": max_tokens,
+            }).encode(),
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {key}"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        text = data["choices"][0]["message"]["content"].strip()
+
+    # 后处理:去掉模型擅自附加的操作后缀(如 "居然Context(10,1,50)" → "居然")
+    import re as _re
+    text = _re.sub(r"\s*(?:Freq|Context|Count)\([^)]*\)\s*$", "", text).strip()
+    text = _re.sub(r"^```[a-zA-Z]*\n?|\n?```$", "", text).strip()
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     if lines and lines[0].upper() == "COMPARE" and len(lines) >= 3:
         qs = [l.split("]", 1)[1].strip() if "]" in l else l for l in lines[1:3]]
@@ -141,20 +170,38 @@ def translate_with_llm(question, syntax):
     return {"mode": "single", "query": lines[0].strip("` ") if lines else text}, None
 
 
-def check_translate_case(case, syntax, use_llm):
+def check_translate_case(case, syntax, examples, use_llm):
     if not use_llm:
         # 离线:只做测试集自检(字段齐全、must_not 不与 expected 冲突)
+        exp = case.get("expected")
         if case["mode"] == "compare":
-            ok = isinstance(case["expected"], list) and len(case["expected"]) == 2
+            ok = isinstance(exp, list) and len(exp) == 2
         else:
-            ok = isinstance(case["expected"], str) and case["expected"]
-        return ok, "format-only" + ("" if ok else " (expected 字段类型错误)")
+            ok = isinstance(exp, str) and bool(exp)
+        if case.get("check") == "wordlist_superset":
+            ok = bool(case.get("core_words"))
+        return ok, "format-only" + ("" if ok else " (字段类型/内容错误)")
 
-    got, err = translate_with_llm(case["question"], syntax)
+    got, err = translate_with_llm(case["question"], syntax, examples)
     if err:
         return False, err
     if got["mode"] != case["mode"]:
         return False, f"模式期望 {case['mode']},得到 {got['mode']}"
+
+    if case.get("check") == "wordlist_superset":
+        # 词表类:模型给出的词表是语义超集即可接受,核心词必须齐、结构必须对
+        q = got["queries"][0] if got["mode"] == "compare" else got["query"]
+        if "{$1=[" not in q:
+            return False, f"缺少词表条件: {q!r}"
+        wl = q.split("{$1=[", 1)[1].split("]", 1)[0].split()
+        missing = [w for w in case["core_words"] if w not in wl]
+        if missing:
+            return False, f"词表缺核心词 {missing}: {q!r}"
+        for bad in case.get("must_not", []):
+            if bad in q:
+                return False, f"命中禁止模式 {bad!r}"
+        return True, q
+
     if case["mode"] == "compare":
         got_qs = got["queries"]
         exp_qs = case["expected"]
@@ -182,11 +229,13 @@ def main():
 
     cases = load(args.suite)
     syntax = ""
+    examples = ""
     if args.suite == "translate":
-        sy = os.path.join(HERE, "..", "skill", "bcc-corpus",
-                          "references", "bcc_syntax.md")
-        with open(sy, encoding="utf-8") as f:
+        ref_dir = os.path.join(HERE, "..", "skill", "bcc-corpus", "references")
+        with open(os.path.join(ref_dir, "bcc_syntax.md"), encoding="utf-8") as f:
             syntax = f.read()
+        with open(os.path.join(ref_dir, "examples.md"), encoding="utf-8") as f:
+            examples = f.read()
 
     print(f"== suite: {args.suite} | cases: {len(cases)} | llm: {args.llm} ==\n")
     fails = 0
@@ -196,7 +245,7 @@ def main():
             if args.suite == "engine":
                 ok, detail = check_engine_case(c)
             else:
-                ok, detail = check_translate_case(c, syntax, args.llm)
+                ok, detail = check_translate_case(c, syntax, examples, args.llm)
         except subprocess.TimeoutExpired:
             ok, detail = False, "TIMEOUT"
         except Exception as e:  # noqa: BLE001
