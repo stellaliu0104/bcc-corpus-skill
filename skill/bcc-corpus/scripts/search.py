@@ -29,29 +29,34 @@ FREQ_TOP_DEFAULT = 30      # freq 返回给 agent 的条数上限(省上下文,�
 CONTEXT_NUMBER_DEFAULT = 30
 
 
+def _has_txt(d):
+    try:
+        return any(f.endswith(".txt") for f in os.listdir(d))
+    except OSError:
+        return False
+
+
 def find_corpus(explicit):
-    """按优先级探测语料目录: 显式参数 > BCC_CORPUS 环境变量 > 技能自带 > 兄弟源项目。"""
-    cands = []
+    """语料目录解析。
+
+    语义(对语言学研究很关键,宁缺勿错):
+      - 显式指定(--corpus)但无效 → 立即失败,绝不静默回退到别的语料库;
+      - 未显式指定 → 依次尝试 BCC_CORPUS 环境变量 > 技能自带 > 兄弟源项目。
+    """
     if explicit:
-        cands.append(explicit)
-    if os.environ.get("BCC_CORPUS"):
-        cands.append(os.environ["BCC_CORPUS"])
-    cands += [
-        os.path.join(HERE, "data", "Corpus"),
-        # 开发/测试回退: 本仓库与 bcc-ai-tool-* 同级时直接复用其语料与索引
-        # (scripts → bcc-corpus → skill → bcc-corpus-skill → BCC document → 302-projects)
-        os.path.abspath(os.path.join(HERE, "..", "..", "..", "..", "..",
-                                     "bcc-ai-tool-mac", "data", "Corpus")),
-        os.path.abspath(os.path.join(HERE, "..", "..", "..", "..", "..",
-                                     "bcc-ai-tool-win", "data", "Corpus")),
-    ]
-    for c in cands:
-        if c and os.path.isdir(c):
-            try:
-                if any(f.endswith(".txt") for f in os.listdir(c)):
-                    return os.path.abspath(c)
-            except OSError:
-                continue
+        if os.path.isdir(explicit) and _has_txt(explicit):
+            return os.path.abspath(explicit)
+        return None  # 显式但无效 → 由调用方报错
+    for c in [os.environ.get("BCC_CORPUS"),
+              os.path.join(HERE, "data", "Corpus"),
+              # 开发/测试回退: 本仓库与 bcc-ai-tool-* 同级时直接复用其语料与索引
+              # (scripts → bcc-corpus → skill → bcc-corpus-skill → BCC document → 302-projects)
+              os.path.abspath(os.path.join(HERE, "..", "..", "..", "..", "..",
+                                           "bcc-ai-tool-mac", "data", "Corpus")),
+              os.path.abspath(os.path.join(HERE, "..", "..", "..", "..", "..",
+                                           "bcc-ai-tool-win", "data", "Corpus"))]:
+        if c and os.path.isdir(c) and _has_txt(c):
+            return os.path.abspath(c)
     return None
 
 
@@ -123,6 +128,9 @@ def main():
     corpus_arg = getattr(args, "corpus", None)
     corpus = find_corpus(corpus_arg)
     if not corpus:
+        if corpus_arg:
+            err(f"指定的语料目录无效: {corpus_arg}",
+                "目录需存在且包含 .txt 语料文件。不会自动改用其他语料库。")
         err("未找到语料目录",
             "请用 --corpus 指定包含 .txt 语料的目录,或让用户先运行 setup.py 导入语料。")
 
