@@ -1,0 +1,18 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# 语料与索引（分发时由打包脚本组装，不入库）
+data/
+skill/bcc-corpus/data/
+skill/bcc-corpus/app/venv/
+
+# 环境与密钥
+.env
+*.env
+
+# 系统
+.DS_Store
+*.log
