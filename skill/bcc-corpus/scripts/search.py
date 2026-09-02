@@ -39,9 +39,10 @@ def find_corpus(explicit):
     cands += [
         os.path.join(HERE, "data", "Corpus"),
         # 开发/测试回退: 本仓库与 bcc-ai-tool-* 同级时直接复用其语料与索引
-        os.path.abspath(os.path.join(HERE, "..", "..", "..", "..",
+        # (scripts → bcc-corpus → skill → bcc-corpus-skill → BCC document → 302-projects)
+        os.path.abspath(os.path.join(HERE, "..", "..", "..", "..", "..",
                                      "bcc-ai-tool-mac", "data", "Corpus")),
-        os.path.abspath(os.path.join(HERE, "..", "..", "..", "..",
+        os.path.abspath(os.path.join(HERE, "..", "..", "..", "..", "..",
                                      "bcc-ai-tool-win", "data", "Corpus")),
     ]
     for c in cands:
@@ -85,27 +86,33 @@ def err(msg, hint=None):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="BCC 语料库检索 CLI")
-    ap.add_argument("--corpus", default=None, help="语料目录")
-    ap.add_argument("--wordlist", action="append", default=[],
-                    metavar="NAME=词1 词2", help="预定义词表,可多次")
-    ap.add_argument("--pretty", action="store_true", help="美化输出")
+    # 全局选项通过 parent parser 下发,保证 --corpus 等放在子命令前后都能识别;
+    # default 用 SUPPRESS,避免子 parser 的默认值覆盖主 parser 已解析的值。
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--corpus", default=argparse.SUPPRESS, help="语料目录")
+    common.add_argument("--wordlist", action="append", default=argparse.SUPPRESS,
+                        metavar="NAME=词1 词2", help="预定义词表,可多次")
+    common.add_argument("--pretty", action="store_true", default=argparse.SUPPRESS,
+                        help="美化输出")
+
+    ap = argparse.ArgumentParser(description="BCC 语料库检索 CLI",
+                                 parents=[common])
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("freq", help="频率检索")
+    p = sub.add_parser("freq", help="频率检索", parents=[common])
     p.add_argument("query")
     p.add_argument("--number", type=int, default=500)
     p.add_argument("--top", type=int, default=FREQ_TOP_DEFAULT)
 
-    p = sub.add_parser("context", help="语境 KWIC 检索")
+    p = sub.add_parser("context", help="语境 KWIC 检索", parents=[common])
     p.add_argument("query")
     p.add_argument("--number", type=int, default=CONTEXT_NUMBER_DEFAULT)
     p.add_argument("--win-size", type=int, default=20)
 
-    p = sub.add_parser("count", help="计数")
+    p = sub.add_parser("count", help="计数", parents=[common])
     p.add_argument("query")
 
-    p = sub.add_parser("compare", help="对比两条检索式(频率+计数)")
+    p = sub.add_parser("compare", help="对比两条检索式(频率+计数)", parents=[common])
     p.add_argument("query_a")
     p.add_argument("query_b")
     p.add_argument("--number", type=int, default=500)
@@ -113,7 +120,8 @@ def main():
 
     args = ap.parse_args()
 
-    corpus = find_corpus(args.corpus)
+    corpus_arg = getattr(args, "corpus", None)
+    corpus = find_corpus(corpus_arg)
     if not corpus:
         err("未找到语料目录",
             "请用 --corpus 指定包含 .txt 语料的目录,或让用户先运行 setup.py 导入语料。")
@@ -121,7 +129,7 @@ def main():
     t0 = time.time()
     try:
         eng = make_engine(corpus)
-        for name, words in parse_wordlists(args.wordlist).items():
+        for name, words in parse_wordlists(getattr(args, "wordlist", None)).items():
             eng.define_wordlist(name, words)
     except Exception as e:  # noqa: BLE001
         err(f"引擎初始化失败: {e}",
@@ -178,7 +186,8 @@ def main():
             "常见原因: ① 检索式语法错误——对照 references/bcc_syntax.md 检查 "
             "(`*`跨词通配/`~`恰好一词/条件写在`{}`内) ② 词表未定义 ③ 语料索引损坏,重跑导入。")
 
-    print(json.dumps(out, ensure_ascii=False, indent=2 if args.pretty else None))
+    print(json.dumps(out, ensure_ascii=False,
+                     indent=2 if getattr(args, "pretty", False) else None))
 
 
 if __name__ == "__main__":
