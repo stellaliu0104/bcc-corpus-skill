@@ -92,6 +92,10 @@ def check_engine_case(case):
             return False, f"items[{key}] 必须全为数值"
     if exp.get("hint_required") and not (data or {}).get("hint"):
         return False, "缺少非空 hint 字段"
+    if exp.get("export_file_required"):
+        p = (data or {}).get("export_path")
+        if not p or not os.path.isfile(p):
+            return False, f"导出文件不存在: {p!r}"
     if "error_contains" in exp and \
             exp["error_contains"] not in str((data or {}).get("error", "")):
         return False, f"error 未包含 {exp['error_contains']!r}: {data}"

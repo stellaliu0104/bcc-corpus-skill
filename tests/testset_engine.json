@@ -63,6 +63,17 @@
       "note": "坏格式必须归类为 wordlist 错误,而非引擎初始化错误"
     },
     {
+      "id": "export_html_and_xlsx",
+      "args": ["context", "居然", "--number", "10", "--export", "html",
+               "--out", "/tmp/bcc-export-test.html"],
+      "expect": { "ok": true, "export_file_required": true }
+    },
+    {
+      "id": "export_count_graceful",
+      "args": ["count", "居然", "--export", "csv", "--out", "/tmp/bcc-export-count.csv"],
+      "expect": { "ok": true, "export_file_required": true }
+    },
+    {
       "id": "compare_numeric_fields",
       "args": ["compare", "很a", "非常a", "--top", "5"],
       "expect": { "ok": true, "items_length": 2,
