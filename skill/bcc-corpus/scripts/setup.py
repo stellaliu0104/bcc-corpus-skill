@@ -15,7 +15,12 @@ import os
 import subprocess
 import sys
 
-SKILL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+from _env import venv_python  # noqa: E402 (跨平台 venv 路径)
+
+SKILL_ROOT = os.path.dirname(HERE)
 VENV = os.path.join(SKILL_ROOT, "venv")
 CORPUS = os.path.join(SKILL_ROOT, "data", "Corpus")
 CLI_DEPS = ["LangSC==2.0.14", "jieba>=0.42.1", "chardet>=7.0.0"]
@@ -23,11 +28,6 @@ GUI_DEPS = ["streamlit>=1.60.0", "pandas>=2.0.0", "openai>=1.0.0",
             "anthropic>=0.120.0", "python-dotenv>=1.0.0", "openpyxl>=3.1.0",
             "python-docx>=1.1.0", "requests>=2.31.0",
             "pywin32>=306; sys_platform == 'win32'"]
-
-
-def venv_python():
-    return os.path.join(VENV, "Scripts", "python.exe") if os.name == "nt" \
-        else os.path.join(VENV, "bin", "python")
 
 
 def check():

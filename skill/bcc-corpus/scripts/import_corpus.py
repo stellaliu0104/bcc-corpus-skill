@@ -12,6 +12,7 @@
 import argparse
 import json
 import os
+import platform
 import shutil
 import sys
 import time
@@ -53,6 +54,22 @@ def main():
                           "supported": list(EXTS)}, ensure_ascii=False))
         sys.exit(1)
 
+    # 旧版 .doc 仅 macOS 可转(系统 textutil);其它平台明确跳过并告知转换方法,
+    # 而不是导入中途报错(跨平台一致性,P0 审查项)
+    skipped_legacy = 0
+    if platform.system() != "Darwin":
+        docs, files = ([f for f in files if f.lower().endswith(".doc")],
+                       [f for f in files if not f.lower().endswith(".doc")])
+        skipped_legacy = len(docs)
+        for f in docs:
+            print(f"[skip] {os.path.basename(f)}: 旧版 .doc 请先用 Word/WPS "
+                  f"另存为 .docx 再导入")
+        if not files:
+            print(json.dumps({"ok": False, "skipped_legacy_doc": skipped_legacy,
+                              "error": "只有旧版 .doc 文件,请先批量另存为 .docx"},
+                             ensure_ascii=False))
+            sys.exit(1)
+
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(map_dir, exist_ok=True)
 
@@ -71,12 +88,20 @@ def main():
     if args.rebuild:
         idx = os.path.join(os.path.dirname(out_dir), "CorpusIdx")
         if os.path.isdir(idx):
-            shutil.rmtree(idx)
+            try:
+                shutil.rmtree(idx)
+            except OSError as e:
+                print(json.dumps({"ok": False,
+                                  "error": f"删除旧索引失败(文件被占用?): {e}",
+                                  "hint": "关闭正在使用语料库的程序后重试"},
+                                 ensure_ascii=False))
+                sys.exit(1)
             print("[rebuild] 已删除旧索引,下次检索自动重建")
 
     n_corpus = len([f for f in os.listdir(out_dir) if f.endswith(".txt")])
     print(json.dumps({
         "ok": fail == 0, "imported": ok, "failed": fail,
+        "skipped_legacy_doc": skipped_legacy,
         "sentences": total_sents,
         "corpus_files_total": n_corpus,
         "elapsed_s": round(time.time() - t0, 1),
