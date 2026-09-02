@@ -85,6 +85,16 @@ def check_engine_case(case):
         items = data.get("items") or []
         if items and any(key not in i for i in items):
             return False, f"items 缺少字段 {key}"
+    for key in exp.get("numeric_item_keys", []):
+        items = data.get("items") or []
+        if not items or not all(
+                isinstance(i.get(key), (int, float)) for i in items):
+            return False, f"items[{key}] 必须全为数值"
+    if exp.get("hint_required") and not (data or {}).get("hint"):
+        return False, "缺少非空 hint 字段"
+    if "error_contains" in exp and \
+            exp["error_contains"] not in str((data or {}).get("error", "")):
+        return False, f"error 未包含 {exp['error_contains']!r}: {data}"
 
     return True, "ok"
 

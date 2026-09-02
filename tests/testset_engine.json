@@ -53,8 +53,20 @@
     {
       "id": "missing_corpus_graceful",
       "args": ["freq", "的", "--corpus", "/tmp/__no_such_corpus__"],
-      "expect": { "json_valid": true, "ok": false },
-      "note": "语料缺失必须返回 ok:false + hint"
+      "expect": { "json_valid": true, "ok": false, "hint_required": true },
+      "note": "语料缺失必须返回 ok:false + 非空 hint(供 agent 重试环使用)"
+    },
+    {
+      "id": "wordlist_bad_format",
+      "args": ["freq", "很(~){$1=[freq_adv]}", "--wordlist", "bad_no_equal_sign"],
+      "expect": { "json_valid": true, "ok": false, "error_contains": "--wordlist" },
+      "note": "坏格式必须归类为 wordlist 错误,而非引擎初始化错误"
+    },
+    {
+      "id": "compare_numeric_fields",
+      "args": ["compare", "很a", "非常a", "--top", "5"],
+      "expect": { "ok": true, "items_length": 2,
+                  "numeric_item_keys": ["count_total", "freq_distinct"] }
     }
   ]
 }
