@@ -54,7 +54,7 @@ skill/bcc-corpus/
 - [x] commit 7: setup/import/launch（模式2/3）+ vendored app（HTTP 200 实测）
 - [x] commit 8: L2 翻译层 GLM-5.3 预验证 → 16/16
 - [x] 跨模型审查循环：gpt-5 两轮（R1"需修改后发布"→ P0×3/P1×9 全部修复 → R2"**可发布**"）
-- [ ] GitHub push（阻塞：本机 github.com token 失效，待 `gh auth login -h github.com`）
+- [x] GitHub push（SSH 密钥认证，2026-09-03 推送完成）
 - [ ] WorkBuddy 真机导入验证（已通过一轮 compare 全数字核验，待覆盖模式2/3）
 - [ ] HY3 翻译准确率实测（用户侧，用 tests/testset_translate.json --llm）
 - [x] 分发 zip 组装脚本（tools/package.py，含 UTF-8 中文名修复——macOS 自带 zip 会让 774 个中文文件名在 Windows 解压乱码，已用 Python zipfile 修复并验证）
