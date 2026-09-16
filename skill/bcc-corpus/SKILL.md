@@ -26,7 +26,7 @@ description: BCC 语料库检索技能。当用户提出语料检索、词汇/�
 | A 和 B 的差别/分工/一样吗 | `compare`（两条检索式） |
 | 只要一个总数 | `count` |
 
-1. **读语法**：生成检索式之前，必须先读 `references/bcc_syntax.md` 和 `references/examples.md`（本技能目录内）。
+1. **读语法**：生成检索式之前，必须先读 `references/bcc_syntax.md` 和 `references/examples.md`（本技能目录内）。若用户问题涉及语言学概念（如"动词""把字句""能愿动词""施事""名词谓语句"等），同时读 `references/linguistics_kb.md` 确认对应 jieba 词性标签或句式特征，再生成检索式。
 2. **映射检索式**：把用户问题对照 examples.md 的同型例子**照搬替换**（改词/词性即可）；找不到同型才基于语法自己组合。对比类问题（"A 和 B 的差别/分工"）→ 用 `compare`（两条检索式）。
 3. **亮出完整命令**：先用一行告诉用户你将执行的完整命令（含子命令与参数），例如 `python scripts/search.py freq "a的n" --top 30`，再执行。检索式复杂或拿不准时，等用户确认后再执行。
 4. **执行**（示例）：
