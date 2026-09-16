@@ -1,6 +1,6 @@
 ---
 name: bcc-corpus
-description: BCC 语料库检索技能。当用户提出语料检索、词汇/句式搭配统计、频率对比、查真实例句、导入新语料、打开语料库界面等需求时使用。触发词：语料、语料库、BCC、检索、搭配、频率、例句、用例、对比、副词、代词、导入语料、完整界面。
+description: BCC 语料库检索技能。当用户提出语料检索、词汇/句式搭配统计、频率对比、查真实例句、导入新语料、删除语料、打开语料库界面等需求时使用。触发词：语料、语料库、BCC、检索、搭配、频率、例句、用例、对比、副词、代词、导入语料、删除语料、移除语料、完整界面。
 ---
 
 # BCC 语料库检索技能
@@ -49,6 +49,32 @@ description: BCC 语料库检索技能。当用户提出语料检索、词汇/�
 1. 问清文件位置（文件夹路径），确认是 .doc/.docx/.xlsx/.md/.txt。**注意：Windows 上旧版 .doc 会被跳过**，提前告知用户先用 Word/WPS 批量另存为 .docx
 2. 运行 `python scripts/import_corpus.py --source <文件夹>`
 3. 成功后报告 JSON 里的 imported/sentences/corpus_files_total/skipped_legacy_doc；如需让改动立即生效可加 `--rebuild`
+
+## 模式 4：删除语料
+
+用户说"删除语料/移除某个文件/清理语料库"时：
+
+1. **先列出语料库现有文件**（让用户选择要删哪个）：
+   ```
+   python scripts/delete_corpus.py --list
+   ```
+   返回 `files` 数组，告知用户当前共有多少个文件。
+
+2. **预览将删除的内容**（不加 `--confirm`，安全第一）：
+   ```
+   python scripts/delete_corpus.py --name 演讲_2024.txt
+   python scripts/delete_corpus.py --pattern "演讲_2024*"
+   ```
+   返回 `preview:true` + `files_to_delete` 列表，**明确告知用户将删除哪些文件及对应映射文件**，等用户确认。
+
+3. **用户确认后执行删除**（加 `--confirm`）：
+   ```
+   python scripts/delete_corpus.py --name 演讲_2024.txt --confirm
+   python scripts/delete_corpus.py --pattern "演讲_2024*" --confirm --rebuild
+   ```
+   成功后报告 deleted/skipped/corpus_files_total；如需立即生效可加 `--rebuild`。
+
+**红线**：未经用户明确确认不得直接运行带 `--confirm` 的命令。删除不可撤销。
 
 ## 模式 3：打开完整界面（兜底）
 
