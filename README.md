@@ -186,7 +186,16 @@ python scripts/setup.py --full
 把“也许”的全部例句导出成可搜索的 HTML 文件。
 ```
 
-结果会注明统计口径（命中数、语料范围、jieba 分词标注）。命中较多或需要作为论文材料留存时，可说“导出”“全部结果”或“Excel”。首次导出前，Agent 会询问结果文件要统一保存到哪个本地目录。
+每次成功查询后，Skill 会自动在浏览器打开一个本机 **“BCC 全部检索结果”** 页面：
+
+- 自动补拉同一检索式的全部 KWIC 命中（安全上限 5000 条）；
+- 展示关键词左右文、所在完整句、语料文件出处与行号；
+- 出处由检索引擎返回或在本机原始语料中回查；无法可靠回查的记录会明确标为“未定位”，不会伪造来源；
+- 页面可按关键词、例句或出处筛选，点击列标题排序，并按 **每页 50 条** 翻页；
+- 页面内可直接点击“导出 CSV（Excel 可打开）”或“导出 HTML”，只导出当前筛选后的记录；下载的导出文件由用户浏览器保存；
+- 页面本身是临时文件：下一次查询会清理上一轮页面，超过 24 小时也会清理。静态本地 HTML 无法可靠感知标签页关闭，因此不能承诺“关闭标签页瞬间删除”；用户点击导出的下载文件不会被清理。
+
+Agent 对话中仍会给出摘要、统计口径（命中数、语料范围、jieba 分词标注）与代表例句；完整记录以自动打开的结果页为准。正常查询不会额外保存文件。只有用户明确要求“导出到指定目录”或“另存文件”时，Agent 才使用命令行 `--export` 生成额外文件，并在首次使用时询问保存目录。
 
 ### 2. 命令行：手写 BCC 检索式
 
@@ -196,7 +205,7 @@ python scripts/setup.py --full
 # 统计总命中数
 python scripts/search.py count "居然"
 
-# 查看 20 条关键词左右文（KWIC）
+# 查看 20 条关键词左右文（KWIC）；同时自动打开全部命中、完整句与出处页面
 python scripts/search.py context "居然" --number 20
 
 # 统计匹配结构的高频词 / 搭配
@@ -215,6 +224,8 @@ python scripts/search.py freq '很(~){$1=[freq_adv]}' \
 - [`skill/bcc-corpus/references/bcc_syntax.md`](skill/bcc-corpus/references/bcc_syntax.md)
 - [`skill/bcc-corpus/references/examples.md`](skill/bcc-corpus/references/examples.md)
 - [`skill/bcc-corpus/references/linguistics_kb.md`](skill/bcc-corpus/references/linguistics_kb.md)
+
+> 如在无图形桌面的服务器或自动化任务中运行，可加 `--no-results-page` 关闭浏览器结果页；正常的 Agent 查询不应使用此参数。
 
 ### 3. 导出检索结果
 

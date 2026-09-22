@@ -12,6 +12,7 @@
   --corpus PATH            语料目录(默认自动探测; 也可用环境变量 BCC_CORPUS)
   --wordlist name=词1 词2  预定义词表,可多次给出,供检索式 {$1=[name]} 引用
   --pretty                 美化 JSON 输出
+  --no-results-page        不生成并打开“全部结果”本地 HTML 页面（默认每次查询自动打开）
 
 输出: 单行 JSON(ok/elapsed_ms/...); 失败时 {"ok":false,"error":...,"hint":...}, 退出码 1。
 """
@@ -29,7 +30,7 @@ sys.path.insert(0, HERE)
 
 FREQ_TOP_DEFAULT = 30      # freq 返回给 agent 的条数上限(省上下文,全部数据在 stdout 可再取)
 CONTEXT_NUMBER_DEFAULT = 30
-EXPORT_NUMBER = 5000       # 导出模式下单次拉取上限(安全阀)
+EXPORT_NUMBER = 5000       # 导出/结果页单次拉取上限(安全阀)
 
 
 def _has_txt(d):
@@ -268,6 +269,9 @@ def main():
                         metavar="NAME=词1 词2", help="预定义词表,可多次")
     common.add_argument("--pretty", action="store_true", default=argparse.SUPPRESS,
                         help="美化输出")
+    common.add_argument("--no-results-page", action="store_true",
+                        default=argparse.SUPPRESS,
+                        help="不生成并打开全部上下文与出处结果页")
     common.add_argument("--export", choices=["html", "xlsx", "csv"],
                         nargs="?", const="html", default=argparse.SUPPRESS,
                         metavar="FMT",
@@ -385,6 +389,47 @@ def main():
         err(f"检索执行失败: {e}",
             "常见原因: ① 检索式语法错误——对照 references/bcc_syntax.md 检查 "
             "(`*`跨词通配/`~`恰好一词/条件写在`{}`内) ② 词表未定义 ③ 语料索引损坏,重跑导入。")
+
+    # 每次成功查询都用同一条 BCC 检索式补拉完整 KWIC，生成本机 HTML 页面。
+    # 对频率/计数/对比查询，这让用户能从统计数字直接查看每条真实命中与出处。
+    if not getattr(args, "no_results_page", False):
+        try:
+            from results_page import cleanup_temp_pages, open_page, write_page  # noqa: E402
+            # 静态 file:// 页面无法可靠捕获标签页关闭；新查询前清理上轮临时页。
+            cleaned = cleanup_temp_pages(remove_all=True)
+            page_queries = ([args.query] if args.cmd != "compare"
+                            else [args.query_a, args.query_b])
+            pages = []
+            for query in page_queries:
+                contexts = eng.search_context(query, number=EXPORT_NUMBER,
+                                              win_size=80)
+                context_records = contexts.get("records") or []
+                total = contexts.get("total", len(context_records))
+                path = write_page(
+                    query=query,
+                    records=context_records,
+                    total=total,
+                    corpus=corpus,
+                    command="Context（由 " + args.cmd + " 查询生成）",
+                    truncated=bool(total and len(context_records) < total),
+                )
+                opened = open_page(path)
+                pages.append({
+                    "query": query,
+                    "path": path,
+                    "opened": opened,
+                    "shown": len(context_records),
+                    "total": total,
+                    "truncated": bool(total and len(context_records) < total),
+                })
+            out["results_pages"] = pages
+            out["results_page_note"] = (
+                "已生成全部命中结果页并尝试在浏览器打开；页面含 KWIC、所在完整句、语料出处、分页与页面内导出。"
+            )
+            out["temporary_pages_cleaned"] = cleaned
+        except Exception as e:  # noqa: BLE001
+            # 结果页是展示增强，不能让已成功的检索变成失败。
+            out["results_page_hint"] = f"结果页生成失败: {e}"
 
     if export:
         try:
