@@ -51,7 +51,14 @@ def plain(text):
 
 
 def display_text(text):
-    return POS_TAG.sub("", text or "").replace("|", " ").strip()
+    """把 BCC 标注行还原为紧凑中文展示文本。
+
+    BCC 语料的每个分词之间有空格（如“他/r 居然/d 把/p”）。删掉词性
+    标记后，这些空格不是原文的一部分，必须一并去除；竖线是旧语料的
+    人工分隔符，同样不应在中文展示中留下空白。
+    """
+    text = POS_TAG.sub("", text or "").replace("|", "")
+    return SPACE.sub("", text).strip()
 
 
 def _lines_for_keyword(corpus, keyword, cache):
@@ -71,11 +78,9 @@ def _lines_for_keyword(corpus, keyword, cache):
                 for index, text in enumerate(lines):
                     normalized = plain(text)
                     if key and key in normalized:
-                        # BCC 的发布语料已按句切分，原始段落边界不再保留；
-                        # 因此“完整段落”以命中句前后连续 3 句组成可复核语境段落。
-                        start, end = max(0, index - 3), min(len(lines), index + 4)
-                        passage = "\n".join(lines[start:end])
-                        matches.append((name, index + 1, text, normalized, passage))
+                        # 发布语料已按句切分，原始段落边界不再保留；先保存整篇
+                        # 连续文本，后续以命中词为中心截取前后各 200 个字符。
+                        matches.append((name, index + 1, text, normalized, index, lines))
         except OSError:
             continue
     cache[key] = matches
@@ -119,7 +124,15 @@ def add_provenance(records, corpus):
         record["source_document"] = best[0]
         record["source_line"] = best[1]
         record["sentence"] = best[2]
-        record["passage"] = best[4]
+        all_text = "\n".join(best[5])
+        sentence_start = sum(len(line) + 1 for line in best[5][:best[4]])
+        keyword_pos = all_text.find(plain(record.get("keyword", "")), sentence_start)
+        if keyword_pos < 0:
+            keyword_pos = sentence_start
+        key_len = max(1, len(plain(record.get("keyword", ""))))
+        start, end = max(0, keyword_pos - 200), min(len(all_text), keyword_pos + key_len + 200)
+        record["passage"] = (("…" if start else "") + all_text[start:end] +
+                             ("…" if end < len(all_text) else ""))
         record["source_status"] = "原始语料回查"
     return records
 
@@ -189,10 +202,10 @@ def write_page(query, records, total, corpus, command, truncated=False):
 <style>
 :root{{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}}body{{margin:0;background:#f5f7fb;color:#162033}}header{{padding:26px max(24px,calc((100vw - 1300px)/2));background:linear-gradient(120deg,#09203f,#335c9b);color:#fff}}h1{{margin:0 0 8px;font-size:25px}}.meta{{opacity:.9;font-size:14px}}main{{max-width:1300px;margin:20px auto;padding:0 20px}}.notice{{background:#eaf2ff;border-left:4px solid #3377d7;padding:12px 14px;border-radius:5px;margin:12px 0 16px}}.bar{{display:flex;gap:10px;flex-wrap:wrap;align-items:center}}#filter{{width:min(440px,100%);padding:11px 13px;border:1px solid #b6c2d1;border-radius:8px;font-size:14px;background:#fff}}button{{border:1px solid #b6c2d1;background:#fff;border-radius:7px;padding:9px 11px;cursor:pointer;color:#203a5c;font-size:13px}}button:hover{{background:#eaf2ff}}button.detail{{white-space:nowrap;background:#f4f8ff}}.count{{margin:11px 0;color:#526071;font-size:13px}}.table-wrap{{background:#fff;border:1px solid #dce3ec;border-radius:9px;overflow:auto;box-shadow:0 1px 4px #18233d12}}table{{border-collapse:collapse;width:100%;min-width:820px;font-size:14px}}th{{position:sticky;top:0;background:#edf3fa;color:#263b55;text-align:left;padding:11px;border-bottom:1px solid #ccd7e3;cursor:pointer;white-space:nowrap}}td{{padding:11px;border-bottom:1px solid #e6ebf1;vertical-align:top;line-height:1.65}}tr:hover{{background:#f4f8ff}}td:first-child{{color:#718096;width:42px;text-align:right}}.sentence{{min-width:500px;max-width:720px}}mark{{background:#ffe083;color:#7d4200;padding:1px 2px;border-radius:2px;font-weight:700}}small{{display:block;color:#718096;margin-top:4px}}.pager{{display:flex;align-items:center;gap:8px;margin:14px 0 4px}}.pager button:disabled{{opacity:.45;cursor:not-allowed}}footer{{color:#788596;font-size:12px;padding:16px 0 30px}}dialog{{border:0;border-radius:12px;box-shadow:0 18px 60px #0005;width:min(780px,calc(100vw - 40px));padding:0}}dialog::backdrop{{background:#10233c99}}.dialog-head{{background:#edf3fa;padding:15px 18px;font-weight:700;display:flex;justify-content:space-between;align-items:center}}.dialog-body{{padding:18px;white-space:pre-wrap;line-height:1.9;max-height:65vh;overflow:auto}}.dialog-meta{{color:#62758a;font-size:13px;margin:0 0 12px}}.close{{font-size:18px;padding:3px 9px}}
 </style></head><body><header><h1>📚 BCC 全部检索结果</h1><div class="meta">检索式：<b>{html.escape(query)}</b>　·　检索类型：{html.escape(command)}　·　命中：<b>{total}</b>　·　{time.strftime('%Y-%m-%d %H:%M')}</div></header>
-<main><div class="notice">{html.escape(note)} 列表只展示命中句及查询目标前后共约 50 字；黄色高亮为查询目标。点击“查看完整段落”可展开命中句前后连续语境。出处由引擎返回或在本机原始语料中回查定位。此页面为临时文件：下一次查询时或 24 小时后自动清理；点击导出下载的文件会保留。</div>
+<main><div class="notice">{html.escape(note)} 列表只展示命中句及查询目标前后共约 50 字；黄色高亮为查询目标。点击“查看完整段落”可展开以命中词为中心前后各最多 200 字的连续语境。出处由引擎返回或在本机原始语料中回查定位；“未定位”表示命中了检索式，但无法从 KWIC 可靠唯一回查到某个源文件。此页面为临时文件：下一次查询时或 24 小时后自动清理；点击导出下载的文件会保留。</div>
 <div class="bar"><input id="filter" autofocus placeholder="🔍 筛选命中句或出处…" oninput="applyFilter()"><button onclick="exportCSV()">导出 CSV（Excel 可打开）</button><button onclick="exportHTML()">导出 HTML</button></div><div id="count" class="count"></div>
 <div class="table-wrap"><table id="results"><thead><tr><th onclick="sortTable(0)"># ↕</th><th onclick="sortTable(1)">命中句与上下文（约 50 字）↕</th><th onclick="sortTable(2)">出处 ↕</th><th>详情</th></tr></thead><tbody>{_context_table(records)}</tbody></table></div><div class="pager"><button id="prev" onclick="go(-1)">← 上一页</button><span id="pageInfo"></span><button id="next" onclick="go(1)">下一页 →</button></div>
-<footer>发布语料已按句切分，完整段落以命中句前后连续 3 句组成的语境段落展示。无法可靠定位出处的记录会明确标注“未定位”。</footer></main><dialog id="passageDialog"><div class="dialog-head"><span>完整语境段落</span><button class="close" onclick="passageDialog.close()">×</button></div><div class="dialog-body"><p id="dialogMeta" class="dialog-meta"></p><div id="dialogText"></div></div></dialog>
+<footer>发布语料已按句切分，原始段落边界不再保留；完整语境以命中词为中心前后各最多 200 个连续字符展示。“未定位”表示该命中没有可可靠唯一确认的源文件，避免误标出处。</footer></main><dialog id="passageDialog"><div class="dialog-head"><span>完整语境段落</span><button class="close" onclick="passageDialog.close()">×</button></div><div class="dialog-body"><p id="dialogMeta" class="dialog-meta"></p><div id="dialogText"></div></div></dialog>
 <script id="exportData" type="application/json">{data_json}</script><script>
 const pageSize={PAGE_SIZE};let page=1,sortAsc=true;const rows=[...document.querySelectorAll('#results tbody tr')];const data=JSON.parse(document.getElementById('exportData').textContent);let filtered=rows;const passageDialog=document.getElementById('passageDialog');
 function render(){{const pages=Math.max(1,Math.ceil(filtered.length/pageSize));page=Math.min(page,pages);rows.forEach(r=>r.style.display='none');filtered.slice((page-1)*pageSize,page*pageSize).forEach(r=>r.style.display='');document.getElementById('count').textContent=`筛选后 ${{filtered.length}} 条 · 每页 ${{pageSize}} 条`;document.getElementById('pageInfo').textContent=`第 ${{page}} / ${{pages}} 页`;document.getElementById('prev').disabled=page<=1;document.getElementById('next').disabled=page>=pages;}}
