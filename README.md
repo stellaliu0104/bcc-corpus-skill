@@ -51,14 +51,96 @@ bcc-corpus 本地脚本：在本地语料上检索，输出 JSON
 
 ## 安装
 
-### 方式 A：让任意支持本地 Skill 的 Agent 安装（推荐）
+### 常用 Agent：一键安装命令
 
-将以下提示交给你的 Agent；它会按该平台自身的 Skill 目录规范安装，而不是假定某一个产品的目录结构：
+下面的命令从 GitHub **最新 Release** 下载完整 `bcc-corpus.zip`（包括脚本、语法参考、界面与共享语料），并放进各平台官方支持的**用户级 Skill 目录**。运行完毕后，重新打开 Agent；首次触发检索时，Agent 会按 `SKILL.md` 运行 `python scripts/setup.py` 完成本地环境初始化。
+
+> **macOS / Linux（需要 `curl` 与 `unzip`）**：命令在临时目录下载并解压 Release，随后只复制 `bcc-corpus/`。不要用普通 Git clone 替代：仓库为避免提交大型语料，不保存 `data/Corpus/`；可用的完整安装包在 Release 中。
+
+#### Pi / Sol-Pi
+
+Pi 官方会扫描 `~/.pi/agent/skills/` 和跨 Agent 通用的 `~/.agents/skills/`。本命令安装到后者，因此 Pi 与遵循该目录的 Codex 都可发现：
+
+```bash
+tmp=$(mktemp -d) && curl -fL https://github.com/stellaliu0104/bcc-corpus-skill/releases/latest/download/bcc-corpus.zip -o "$tmp/bcc-corpus.zip" \
+  && unzip -q "$tmp/bcc-corpus.zip" -d "$tmp" \
+  && rm -rf ~/.agents/skills/bcc-corpus \
+  && mkdir -p ~/.agents/skills \
+  && cp -R "$tmp/bcc-corpus" ~/.agents/skills/ \
+  && rm -rf "$tmp"
+```
+
+重启 Pi 后，可输入：
 
 ```text
-请安装 GitHub 仓库 stellaliu0104/bcc-corpus-skill 中的 bcc-corpus Skill。
-仓库地址：https://github.com/stellaliu0104/bcc-corpus-skill
-请依据你所在平台的 Skill 安装规范，将仓库中的 skill/bcc-corpus 安装为本地 Skill 并启用。
+/skill:bcc-corpus 查一下“竟然”的 20 个例句
+```
+
+也可直接自然语言提问，让 Pi 自动匹配该 Skill。
+
+#### Codex CLI / Codex IDE
+
+Codex 官方扫描 `~/.agents/skills/`；如果已经运行过上面的 Pi / Sol-Pi 命令，**不必重复安装**。单独安装时运行：
+
+```bash
+tmp=$(mktemp -d) && curl -fL https://github.com/stellaliu0104/bcc-corpus-skill/releases/latest/download/bcc-corpus.zip -o "$tmp/bcc-corpus.zip" \
+  && unzip -q "$tmp/bcc-corpus.zip" -d "$tmp" \
+  && rm -rf ~/.agents/skills/bcc-corpus \
+  && mkdir -p ~/.agents/skills \
+  && cp -R "$tmp/bcc-corpus" ~/.agents/skills/ \
+  && rm -rf "$tmp"
+```
+
+重启 Codex 后使用 `/skills` 查看，或在提示中显式写：
+
+```text
+$bcc-corpus 查一下“竟然”的 20 个例句
+```
+
+也可以把目录放在当前项目的 `.agents/skills/bcc-corpus/`，使其仅对该项目生效：
+
+```bash
+tmp=$(mktemp -d) && curl -fL https://github.com/stellaliu0104/bcc-corpus-skill/releases/latest/download/bcc-corpus.zip -o "$tmp/bcc-corpus.zip" \
+  && unzip -q "$tmp/bcc-corpus.zip" -d "$tmp" \
+  && mkdir -p .agents/skills \
+  && rm -rf .agents/skills/bcc-corpus \
+  && cp -R "$tmp/bcc-corpus" .agents/skills/ \
+  && rm -rf "$tmp"
+```
+
+#### Claude Code
+
+Claude Code 的用户级 Skill 目录是 `~/.claude/skills/`：
+
+```bash
+tmp=$(mktemp -d) && curl -fL https://github.com/stellaliu0104/bcc-corpus-skill/releases/latest/download/bcc-corpus.zip -o "$tmp/bcc-corpus.zip" \
+  && unzip -q "$tmp/bcc-corpus.zip" -d "$tmp" \
+  && rm -rf ~/.claude/skills/bcc-corpus \
+  && mkdir -p ~/.claude/skills \
+  && cp -R "$tmp/bcc-corpus" ~/.claude/skills/ \
+  && rm -rf "$tmp"
+```
+
+Claude Code 通常可自动发现目录变更；未出现时重开会话并运行 `/skills`。显式调用：
+
+```text
+/bcc-corpus 查一下“竟然”的 20 个例句
+```
+
+只给某个项目安装时，将目标目录改为该项目根目录的 `.claude/skills/bcc-corpus/` 即可。
+
+#### WorkBuddy
+
+下载 [Release](https://github.com/stellaliu0104/bcc-corpus-skill/releases) 中的 `bcc-corpus.zip`，从 WorkBuddy 的 **Skills / 技能** 页面上传并启用。图文步骤见 [`docs/师门使用手册.md`](docs/师门使用手册.md)。
+
+### 方式 B：让当前 Agent 安装
+
+不想在终端执行命令时，将下列提示直接交给当前 Agent：
+
+```text
+请安装 BCC Corpus Skill 的最新 Release。
+Release 页面：https://github.com/stellaliu0104/bcc-corpus-skill/releases
+请下载最新 Release 的 bcc-corpus.zip；解压后，依据你所在平台的 Skill 安装规范，将完整的 bcc-corpus 目录安装为本地 Skill 并启用。不要只 clone 仓库源码，因为共享语料在 Release ZIP 中。
 如需 Python 环境，请在该 Skill 目录运行 python scripts/setup.py；安装完成后执行：
 python scripts/search.py count "居然"
 请报告检索结果或真实的安装错误，不要编造结果。
@@ -66,12 +148,12 @@ python scripts/search.py count "居然"
 
 安装后，如果 Agent 不会自动发现新 Skill，请按该平台要求刷新 Skills、重开会话或重启 Agent。
 
-### 方式 B：从 GitHub Release 下载
+### 方式 C：从 GitHub Release 下载
 
 从 [Releases](https://github.com/stellaliu0104/bcc-corpus-skill/releases) 下载 `bcc-corpus.zip`：
 
 - **WorkBuddy**：可在 Skills / 技能页直接上传 ZIP；具体图文步骤见 [`docs/师门使用手册.md`](docs/师门使用手册.md)。
-- **Pi、Claude Code、Codex 等**：如平台不支持 ZIP 导入，请解压后，把其中的 `bcc-corpus/` 放到该平台规定的本地 Skill 目录；不要只复制 `SKILL.md`，需要保留 `scripts/`、`references/`、`app/` 和 `data/`。
+- **Pi / Codex / Claude Code 等**：如不使用上面的 Git 命令，可解压后把完整的 `bcc-corpus/` 放到平台规定的本地 Skill 目录；不要只复制 `SKILL.md`，还需要 `scripts/`、`references/`、`app/` 和 `data/`。
 
 首次运行需要创建本地 Python 虚拟环境、安装 LangSC 等依赖，并在首次检索时建立索引，通常需要数分钟：
 
