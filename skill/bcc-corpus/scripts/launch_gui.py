@@ -48,7 +48,7 @@ def main():
             with urllib.request.urlopen(url, timeout=2) as resp:
                 if resp.status == 200:
                     print(f"界面已启动: {url} (PID {proc.pid})")
-                    print("在浏览器打开上述地址即可使用;关闭本窗口或按 Ctrl+C 退出。")
+                    print("请在浏览器打开上述地址即可使用；若当前 Agent 支持打开本机链接，也可请它打开该地址。关闭本窗口或按 Ctrl+C 退出。")
                     return
         except Exception:  # noqa: BLE001
             if proc.poll() is not None:

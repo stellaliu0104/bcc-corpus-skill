@@ -87,7 +87,7 @@ def main():
                 entries += 1
     size = os.path.getsize(zip_path) / 1024 / 1024
     print(f"打包完成: skill/bcc-corpus.zip ({entries} 个条目, {size:.1f}M, v{version})")
-    print("首次安装: WorkBuddy 设置 → 技能 → 上传技能 → 拖入 zip")
+    print("首次安装: 按目标 Agent 的 Skill 安装规范导入 ZIP，或解压其中的 bcc-corpus/ 目录安装")
     print(f"升级发布: 创建 GitHub Release v{version}，并上传此文件且附件名保持 bcc-corpus.zip")
 
 

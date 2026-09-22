@@ -1,57 +1,98 @@
-# BCC 语料库检索 Skill
+# BCC Corpus Skill
 
-> 面向中文语言学研究与教学的本地语料检索工具：在 WorkBuddy 对话中用自然语言提问，也可以打开 Streamlit 图形界面手写检索式、管理语料和导出结果。
+> 一个可安装到本地 Agent 的中文语料库检索 Skill。用自然语言完成词频、搭配、KWIC 例句与表达对比；也可使用 Streamlit 图形界面手写 BCC 检索式、导入语料和导出研究材料。
 
 [![GitHub](https://img.shields.io/badge/GitHub-stellaliu0104%2Fbcc--corpus--skill-181717?logo=github)](https://github.com/stellaliu0104/bcc-corpus-skill)
+[![Release](https://img.shields.io/github/v/release/stellaliu0104/bcc-corpus-skill?label=release)](https://github.com/stellaliu0104/bcc-corpus-skill/releases)
 
-它将 BCC/LangSC 检索能力封装为 Agent Skill，适合对演讲、口传或自行导入的中文文本做可复核的词频、搭配、例句和对比研究。检索与索引均在**用户本机**完成；WorkBuddy 只负责理解问题、生成检索式和解释结果。
+`bcc-corpus` 的本质是一个 **Agent Skill**，不是 WorkBuddy 专属应用：Agent 负责理解研究问题、选择检索策略和解释结果；Skill 在本机运行 Python 与 LangSC/BCC 引擎，语料、索引和导出文件均保存在本机。
+
+适用于 **Pi / Sol-Pi、Claude Code、Codex、WorkBuddy**，以及其他同时具备以下能力的 Agent：
+
+1. 能加载包含 `SKILL.md` 的本地 Skill；
+2. 能读取 Skill 目录中的参考资料并执行本地 Python 命令；
+3. 首次使用时允许创建虚拟环境、安装 Python 依赖；
+4. 需要完整界面时，能访问本机浏览器的 `localhost`。
+
+> Agent 的 Skill 安装路径与刷新方式因产品、版本和团队策略而不同。请优先遵循你的 Agent 官方 Skill 安装说明；仓库和安装包内的实际 Skill 根目录均为 `skill/bcc-corpus/`。
+
+---
 
 ## 能做什么
 
-| 能力 | 说明 | 示例问题 |
+| 能力 | 说明 | 示例提问 |
 |---|---|---|
-| 词频与搭配 | 查某词、词性组合或结构中的高频词 | “`很` 后面最常接什么形容词？” |
-| KWIC 例句 | 返回关键词左右文，查看真实使用语境 | “给我 20 个 `竟然` 的例句” |
+| 词频与搭配 | 查询词、词性组合或结构中的高频词 | “`很` 后面最常接什么形容词？” |
+| KWIC 例句 | 返回关键词左右文，查看真实使用语境 | “给我 20 个 `竟然` 的例句。” |
 | 表达对比 | 比较两种表达的频率与典型搭配 | “`曾经` 和 `已经` 在语料里有什么差别？” |
 | 精确计数 | 统计某一检索式的总命中数 | “`居然` 一共出现多少次？” |
-| 导出材料 | 导出可搜索、排序的 HTML，或 Excel/CSV | “把全部例句导出 Excel” |
-| 导入/删除语料 | 导入自己的文档，或先预览再删除指定语料 | “导入桌面上的访谈稿”“删除 2024 年演讲稿” |
-| Streamlit 界面 | 图形化手写查询、浏览结果与管理语料 | “打开完整界面” |
+| 导出材料 | 导出可搜索、排序的 HTML，或 Excel/CSV | “把全部例句导出 Excel。” |
+| 导入 / 删除语料 | 导入自己的文本；删除前先预览、确认后执行 | “导入桌面的访谈稿。” |
+| Streamlit 界面 | 图形化手写查询、浏览结果、管理语料 | “打开完整界面。” |
 
-## 快速开始：安装到 WorkBuddy
-
-### 方式 A：上传安装包
-
-1. 下载 GitHub Release 中的 `bcc-corpus.zip`；
-2. 在 WorkBuddy 的 **Skills / 技能** 页面上传并启用该 ZIP；
-3. 新开一个对话，直接提问，例如：
+## 工作方式与边界
 
 ```text
-统计一下“居然”出现多少次，并给我 10 个典型例句。
+你的自然语言研究问题
+          ↓
+当前 Agent：读 SKILL.md / 参考语法，生成或选择 BCC 检索式
+          ↓
+bcc-corpus 本地脚本：在本地语料上检索，输出 JSON
+          ↓
+当前 Agent：基于真实结果解释、制表、导出
 ```
 
-### 方式 B：让 WorkBuddy Agent 自动安装
+- **不依赖 Agent 的 API Key**：日常检索由当前 Agent 的对话模型推理；本地检索脚本不读取、复制或转发 Agent 的 OAuth / API 凭证。
+- **本机处理数据**：语料、索引、配置和导出结果默认不上传至 GitHub、Agent 服务或其他成员电脑。
+- **结果可复核**：脚本输出 JSON；Skill 要求 Agent 先读语法参考、展示执行命令、不得编造频次或例句。
+- **Streamlit 的 AI 分析页是可选功能**：基础检索和语料管理不需要 Key；若在该页直接调用 DeepSeek、GLM、OpenAI-compatible 或 Claude，需要用户自行配置该服务商的 Key，且只保存于本机。
 
-将下面整段话复制到 WorkBuddy 对话中：
+---
+
+## 安装
+
+### 方式 A：让任意支持本地 Skill 的 Agent 安装（推荐）
+
+将以下提示交给你的 Agent；它会按该平台自身的 Skill 目录规范安装，而不是假定某一个产品的目录结构：
 
 ```text
-请帮我安装 GitHub 仓库 stellaliu0104/bcc-corpus-skill 中的 bcc-corpus Skill。
+请安装 GitHub 仓库 stellaliu0104/bcc-corpus-skill 中的 bcc-corpus Skill。
 仓库地址：https://github.com/stellaliu0104/bcc-corpus-skill
-请将 skill/bcc-corpus 安装到 WorkBuddy 的 Skills 目录并启用；如需安装 Python 依赖，请自动完成。
-安装完成后，运行一次“统计一下‘居然’出现多少次”验证检索是否可用，并告诉我结果。
+请依据你所在平台的 Skill 安装规范，将仓库中的 skill/bcc-corpus 安装为本地 Skill 并启用。
+如需 Python 环境，请在该 Skill 目录运行 python scripts/setup.py；安装完成后执行：
+python scripts/search.py count "居然"
+请报告检索结果或真实的安装错误，不要编造结果。
 ```
 
-首次使用时，Skill 会创建本地 Python 虚拟环境、安装 LangSC 等依赖，并在首次检索时建立索引，通常需要数分钟。之后可直接在 WorkBuddy 对话中使用，**对话检索不需要填写第三方模型 API Key**。
+安装后，如果 Agent 不会自动发现新 Skill，请按该平台要求刷新 Skills、重开会话或重启 Agent。
 
-> 完整的 WorkBuddy 上传图文步骤见 [`docs/师门使用手册.md`](docs/师门使用手册.md)。
+### 方式 B：从 GitHub Release 下载
+
+从 [Releases](https://github.com/stellaliu0104/bcc-corpus-skill/releases) 下载 `bcc-corpus.zip`：
+
+- **WorkBuddy**：可在 Skills / 技能页直接上传 ZIP；具体图文步骤见 [`docs/师门使用手册.md`](docs/师门使用手册.md)。
+- **Pi、Claude Code、Codex 等**：如平台不支持 ZIP 导入，请解压后，把其中的 `bcc-corpus/` 放到该平台规定的本地 Skill 目录；不要只复制 `SKILL.md`，需要保留 `scripts/`、`references/`、`app/` 和 `data/`。
+
+首次运行需要创建本地 Python 虚拟环境、安装 LangSC 等依赖，并在首次检索时建立索引，通常需要数分钟：
+
+```bash
+cd /path/to/bcc-corpus
+python scripts/setup.py
+```
+
+如需 Streamlit 完整界面，改用：
+
+```bash
+python scripts/setup.py --full
+```
 
 ---
 
 ## 如何检索语料
 
-### 1. 推荐：直接在 WorkBuddy 对话中提问
+### 1. 直接向 Agent 提问（推荐）
 
-不必先学 BCC 检索语法。Agent 会根据问题选择检索方式、执行本地检索，再用表格和例句解释结果。
+无需先学习 BCC 检索语法。已启用 Skill 的 Agent 会把自然语言问题映射为检索式、运行本地命令，并依据真实输出解读。
 
 ```text
 查一下“竟然”的 20 个例句。
@@ -63,17 +104,11 @@
 把“也许”的全部例句导出成可搜索的 HTML 文件。
 ```
 
-输出会明确统计口径（命中数、语料范围、jieba 分词标注），不会编造检索数字。命中较多或需要写论文留存时，可说“导出”“全部结果”或“Excel”。首次导出前，Agent 会询问你希望把结果统一保存到哪个文件夹。
+结果会注明统计口径（命中数、语料范围、jieba 分词标注）。命中较多或需要作为论文材料留存时，可说“导出”“全部结果”或“Excel”。首次导出前，Agent 会询问结果文件要统一保存到哪个本地目录。
 
 ### 2. 命令行：手写 BCC 检索式
 
-已安装 Skill 后，在 `bcc-corpus` 目录运行以下命令。首次命令行使用如提示环境未就绪，先执行：
-
-```bash
-python scripts/setup.py
-```
-
-常用检索命令：
+在 `bcc-corpus` 根目录运行。首次使用如提示环境未就绪，先执行 `python scripts/setup.py`。
 
 ```bash
 # 统计总命中数
@@ -82,25 +117,26 @@ python scripts/search.py count "居然"
 # 查看 20 条关键词左右文（KWIC）
 python scripts/search.py context "居然" --number 20
 
-# 统计匹配结构的高频词/搭配
+# 统计匹配结构的高频词 / 搭配
 python scripts/search.py freq "很a" --top 30
 
 # 对比两条检索式
 python scripts/search.py compare "很a" "非常a" --top 20
 
-# 使用自定义词表：查询“很 + 高频副词”类结构
+# 自定义词表
 python scripts/search.py freq '很(~){$1=[freq_adv]}' \
   --wordlist 'freq_adv=经常 常常 偶尔 时常 往往'
 ```
 
-所有命令返回 JSON，便于 Agent 或其他程序读取。可加 `--pretty` 查看格式化 JSON。BCC 检索式与更多示例见：
+脚本默认输出 JSON，可加 `--pretty` 格式化查看。检索语法与可直接套用的示例见：
 
 - [`skill/bcc-corpus/references/bcc_syntax.md`](skill/bcc-corpus/references/bcc_syntax.md)
 - [`skill/bcc-corpus/references/examples.md`](skill/bcc-corpus/references/examples.md)
+- [`skill/bcc-corpus/references/linguistics_kb.md`](skill/bcc-corpus/references/linguistics_kb.md)
 
 ### 3. 导出检索结果
 
-默认推荐交互式 HTML：双击可打开、文本筛选、点击表头排序；也支持 `xlsx` 和 `csv`。
+默认推荐交互式 HTML：双击即可打开、文本筛选、点击表头排序；也支持 `xlsx` 与 `csv`。
 
 ```bash
 # 默认导出 HTML
@@ -113,25 +149,19 @@ python scripts/search.py context "居然" --export xlsx
 python scripts/search.py freq "很a" --export html --out ~/Desktop/hen-a.html
 ```
 
-### 4. 打开 Streamlit 完整界面
+### 4. Streamlit 完整界面
 
-适合需要手写检索式、可视化操作或批量管理语料的场景：
+适合手写检索式、可视化操作或批量管理语料：
 
 ```bash
-# 首次打开完整界面，安装 GUI 依赖
+# 首次使用 GUI 时安装依赖
 python scripts/setup.py --full
 
-# 启动界面（默认 http://localhost:8501）
+# 启动（默认 http://localhost:8501）
 python scripts/launch_gui.py
 ```
 
-也可以在 WorkBuddy 对话中说：
-
-```text
-打开完整界面
-```
-
-Streamlit 的**基础检索**和**语料管理**不需要 API Key。其“AI 分析”页是独立模型调用；如要使用，可在界面中配置 DeepSeek、GLM、OpenAI-compatible 或 Claude 的个人凭证。请不要把密钥提交到 GitHub 或发到群聊。
+也可以直接对当前 Agent 说“打开完整界面”。基础检索、导入和删除语料都不需要模型 Key；只有页面内的“AI 分析”使用独立服务商 API。
 
 ---
 
@@ -139,105 +169,122 @@ Streamlit 的**基础检索**和**语料管理**不需要 API Key。其“AI 分
 
 ### 导入
 
-支持 `.doc`、`.docx`、`.xlsx`、`.md`、`.txt`。将源文件放进一个文件夹后：
+支持 `.doc`、`.docx`、`.xlsx`、`.md`、`.txt`。将源文件放进同一个文件夹后：
 
 ```bash
 python scripts/import_corpus.py --source ~/Desktop/新语料 --rebuild
 ```
 
-- 导入后生成适用于 BCC 的已分词标注文本；
-- `--rebuild` 会删除旧索引，下一次检索自动重建；
+- 导入后会生成适用于 BCC 的已分词标注文本；
+- `--rebuild` 删除旧索引，下一次检索自动重建；
 - macOS 可以处理旧版 `.doc`；Windows/Linux 请先用 Word/WPS 将 `.doc` 另存为 `.docx`；
-- Agent 模式下只需说“我有新语料要导入，文件在……”。
+- 使用 Agent 时，只需说“我有新语料要导入，文件在……”。
 
-### 删除（必须先预览，再确认）
+### 删除：必须先预览，再确认
 
 ```bash
-# 查看现有语料
+# 列出现有语料
 python scripts/delete_corpus.py --list
 
-# 预览：不会实际删除
+# 预览，不会实际删除
 python scripts/delete_corpus.py --name 演讲_2024.txt
 
 # 明确确认后才删除，并让下次检索重建索引
 python scripts/delete_corpus.py --name 演讲_2024.txt --confirm --rebuild
 ```
 
-也可用 `--pattern "演讲_2024*"` 批量匹配。删除不可撤销，因此不带 `--confirm` 时只会返回待删除清单。
+也可使用 `--pattern "演讲_2024*"` 批量匹配。删除不可撤销；不带 `--confirm` 只会显示待删除清单。
 
-### 数据归属与隐私
+### 本地数据与隐私
 
-你的个人语料、索引和导出目录都保留在本机：
-
-| 目录 | 内容 | 是否自动上传 |
+| 目录 | 内容 | 自动上传？ |
 |---|---|---|
 | `data/Corpus/` | 导入后的可检索语料 | 否 |
 | `data/CorpusIdx/` | 本地检索索引 | 否 |
 | `data/_maps/` | 导入文件与处理结果的映射 | 否 |
-| `app/config/` | Streamlit 本地设置和模型配置 | 否 |
+| `app/config/` | Streamlit 本地设置与可选的模型配置 | 否 |
 
-共享语料请由维护者审核后单独发布。导入前请确认文件可在当前电脑保存，并遵守团队的数据使用规范。
+共享语料应由维护者审核后单独发布。导入前请确认文件允许保存在当前电脑，并遵守团队的数据使用规范。
 
 ---
 
-## 一键更新到最新版本
+## 更新到最新版本
 
-普通版本更新不需要重新上传 Skill，也不会覆盖你的语料。在 WorkBuddy 对话中说：
+可以对当前 Agent 说：
 
 ```text
-更新 BCC 语料库
+更新 BCC 语料库。
 ```
 
-Agent 会先检查版本，告知变更后等待确认：
+Skill 会先检查 GitHub Release 版本，在你确认后更新：
 
 ```bash
 python scripts/update.py --check
 python scripts/update.py
 ```
 
-更新器从本仓库最新 GitHub Release 下载名为 `bcc-corpus.zip` 的附件，校验压缩包结构后仅替换程序文件。它**不会上传或读取你的私有语料，不会执行下载包中的脚本**，并会保留：
+更新器只从本仓库最新 GitHub Release 下载名为 `bcc-corpus.zip` 的附件，验证压缩包路径后仅替换程序文件。它不会执行下载包中的脚本，也不会覆盖以下本地数据：
 
-- `data/Corpus/`：自己导入的语料；
+- `data/Corpus/`：自行导入的语料；
 - `data/CorpusIdx/`：本地索引；
-- `app/config/`：界面设置和本地模型配置；
+- `app/config/`：界面设置与模型配置；
 - `venv/`：本地 Python 环境与已安装依赖。
 
-更新完成后应运行一次基础检索验证。更新前请关闭正在运行的 Streamlit 页面或检索任务；若新版新增 GUI 依赖，再执行：
+更新前请关闭正在运行的 Streamlit 或检索任务。若新版本增加 GUI 依赖，运行：
 
 ```bash
 python scripts/setup.py --full
 ```
 
-> 注意：一键更新要求维护者已创建 GitHub Release 并上传 `bcc-corpus.zip`。仅推送代码到 `main` 分支不会触发用户端更新。
+> 更新器使用 GitHub Releases，而不是 `main` 分支；维护者仅推送代码时，用户端不会检测为可更新版本。
+
+---
+
+## 平台适配说明
+
+| Agent / 平台 | 适配状态 | 使用方式 |
+|---|---|---|
+| Pi / Sol-Pi | 支持 | 依照 Pi 的 Skill 发现规则安装 `bcc-corpus/`；Agent 读取 `SKILL.md` 后执行本地脚本。 |
+| Claude Code | 支持 | 按 Claude Code 的本地 Skill 规范安装目录；首次运行允许执行 `scripts/setup.py`。 |
+| Codex | 支持 | 按 Codex 的 Agent/Skill 配置规范安装目录；需要允许 shell/Python 与本机文件访问。 |
+| WorkBuddy | 支持 | 可导入 Release ZIP，或按其 Skill 目录规则安装；WorkBuddy 专用教程见下方链接。 |
+| 其他本地 Agent | 通常支持 | 满足本 README 开头的四项能力即可；目录规则由该 Agent 决定。 |
+
+兼容性指的是**Skill 的检索能力**：不同 Agent 的安装入口、权限确认、Skill 刷新方式与浏览器打开方式由平台自身控制。若某平台不允许执行本地 Python、创建 venv 或访问本机文件，则无法直接运行本 Skill。
+
+### WorkBuddy 专用文档
+
+WorkBuddy 用户可参考：
+
+- [`docs/师门使用手册.md`](docs/师门使用手册.md)：面向普通使用者的安装与研究流程；
+- [`docs/WorkBuddy导入教程.md`](docs/WorkBuddy导入教程.md)：面向维护者的打包与上传说明。
 
 ---
 
 ## 维护者发布新版
 
-每次发布可更新的版本：
-
 ```bash
 # 1) 修改 skill/bcc-corpus/VERSION，例如 1.2.0
-# 2) 测试并打包；--corpus 指向要随“首次安装包”分发的共享语料目录
+# 2) 测试并打包；--corpus 指向随首次安装包分发的共享语料目录
 python3 tools/package.py --corpus /path/to/Corpus
 
-# 3) 提交和推送代码，创建 tag，例如 v1.2.0
-# 4) 在 GitHub 创建同名 Release，并上传生成的 skill/bcc-corpus.zip
+# 3) 提交并推送代码，创建 tag，例如 v1.2.0
+# 4) 在 GitHub 创建同名 Release，上传生成的 skill/bcc-corpus.zip
 ```
 
-Release 附件名必须严格为 **`bcc-corpus.zip`**，且包内 `VERSION` 应与 Release 对应。用户端更新器只识别此附件名。
+Release 附件名必须严格为 **`bcc-corpus.zip`**，且包内 `VERSION` 应与 Release 对应。更新器只识别该附件名。
 
-为避免覆盖个人资料，常规程序升级不会更新 `data/Corpus/`。如需发布共享语料，请明确单独提供语料包或在首次安装包中发布，并在 Release 说明中写清范围与来源。
+为避免覆盖个人资料，常规程序升级不更新 `data/Corpus/`。需要发布共享语料时，应单独提供语料包，或在首次安装包中携带，并在 Release 说明中写清范围、来源和更新方式。
 
 ---
 
 ## 开发与测试
 
 ```bash
-# L1：检索引擎测试（需已经建立 venv 并安装 LangSC）
+# L1：检索引擎测试（需已建立 venv 并安装 LangSC）
 ./venv/bin/python tests/run_tests.py --corpus ../bcc-ai-tool-mac/data/Corpus
 
-# L2：翻译层预验证（可选，需要 GLM 配置）
+# L2：翻译层预验证（可选，需要单独配置 GLM 或兼容服务）
 ./venv/bin/python tests/run_tests.py --suite translate --llm zhipuai
 ```
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""BCC 语料库检索 CLI —— WorkBuddy 技能「bcc-corpus」模式1 的执行入口。
+"""BCC 语料库检索 CLI —— Agent Skill「bcc-corpus」模式1 的执行入口。
 
 子命令:
   freq     频率检索:   python search.py freq "a的n" [--number 500] [--top 30]
