@@ -50,14 +50,16 @@ def plain(text):
     return SPACE.sub("", text).replace("|", "")
 
 
-def display_text(text):
-    """把 BCC 标注行还原为紧凑中文展示文本。
+def display_text(text, preserve_lines=False):
+    """把 BCC 标注行还原为中文展示文本。
 
     BCC 语料的每个分词之间有空格（如“他/r 居然/d 把/p”）。删掉词性
-    标记后，这些空格不是原文的一部分，必须一并去除；竖线是旧语料的
-    人工分隔符，同样不应在中文展示中留下空白。
+    标记后，这些空格不是原文的一部分，必须一并去除。列表摘要使用紧凑
+    单行；弹窗完整语境保留本工具拼接的连续句子换行。
     """
     text = POS_TAG.sub("", text or "").replace("|", "")
+    if preserve_lines:
+        return "\n".join(SPACE.sub("", line).strip() for line in text.splitlines() if line.strip())
     return SPACE.sub("", text).strip()
 
 
@@ -181,7 +183,8 @@ def _export_records(records):
         "左上下文": display_text(r.get("left")),
         "右上下文": display_text(r.get("right")),
         "命中句与上下文（约50字）": _snippet(r),
-        "完整语境段落": display_text(r.get("passage")) or display_text(r.get("sentence")) or "—",
+        "完整语境段落": (display_text(r.get("passage"), preserve_lines=True) or
+                   display_text(r.get("sentence")) or "—"),
         "出处": (r.get("source_document") or "未定位") +
               (f" · 第 {r['source_line']} 行" if r.get("source_line") else ""),
         "出处状态": r.get("source_status", ""),
