@@ -67,11 +67,15 @@ def _lines_for_keyword(corpus, keyword, cache):
         path = os.path.join(corpus, name)
         try:
             with open(path, "r", encoding="gbk", errors="replace") as source:
-                for line_no, tagged in enumerate(source, 1):
-                    text = display_text(tagged)
+                lines = [display_text(line) for line in source if line.strip()]
+                for index, text in enumerate(lines):
                     normalized = plain(text)
                     if key and key in normalized:
-                        matches.append((name, line_no, text, normalized))
+                        # BCC 的发布语料已按句切分，原始段落边界不再保留；
+                        # 因此“完整段落”以命中句前后连续 3 句组成可复核语境段落。
+                        start, end = max(0, index - 3), min(len(lines), index + 4)
+                        passage = "\n".join(lines[start:end])
+                        matches.append((name, index + 1, text, normalized, passage))
         except OSError:
             continue
     cache[key] = matches
@@ -115,6 +119,7 @@ def add_provenance(records, corpus):
         record["source_document"] = best[0]
         record["source_line"] = best[1]
         record["sentence"] = best[2]
+        record["passage"] = best[4]
         record["source_status"] = "原始语料回查"
     return records
 
@@ -125,17 +130,32 @@ def _highlight(text, keyword):
     return escaped.replace(needle, f'<mark>{needle}</mark>') if needle else escaped
 
 
+def _snippet(record, radius=25):
+    """展示命中句所在语境中查询目标前后共约 50 个字符。"""
+    sentence = display_text(record.get("sentence") or "")
+    passage = display_text(record.get("passage") or "")
+    keyword = display_text(record.get("keyword") or "")
+    text = passage or sentence
+    if not text or not keyword:
+        return sentence or display_text(record.get("left", "")) + keyword + display_text(record.get("right", ""))
+    index = text.find(keyword)
+    if index < 0:
+        return sentence or text
+    start, end = max(0, index - radius), min(len(text), index + len(keyword) + radius)
+    return ("…" if start else "") + text[start:end] + ("…" if end < len(text) else "")
+
+
 def _context_table(records):
     rows = []
-    for record in records:
+    for index, record in enumerate(records):
         source = record.get("source_document") or "未定位"
         if record.get("source_line"):
             source += f" · 第 {record['source_line']} 行"
         rows.append(f"""<tr>
 <td>{record.get('id', '')}</td>
-<td class="kwic"><span>{_highlight(record.get('left'), record.get('keyword'))}</span><mark>{html.escape(display_text(record.get('keyword')))}</mark><span>{_highlight(record.get('right'), record.get('keyword'))}</span></td>
-<td class="sentence">{_highlight(record.get('sentence') or '—', record.get('keyword'))}</td>
+<td class="sentence">{_highlight(_snippet(record), record.get('keyword'))}</td>
 <td><b>{html.escape(source)}</b><small>{html.escape(record.get('source_status', ''))}</small></td>
+<td><button class="detail" onclick="showPassage({index})">查看完整段落</button></td>
 </tr>""")
     return "".join(rows) or '<tr><td colspan="4">没有可展示的上下文结果。</td></tr>'
 
@@ -147,7 +167,8 @@ def _export_records(records):
         "关键词": display_text(r.get("keyword")),
         "左上下文": display_text(r.get("left")),
         "右上下文": display_text(r.get("right")),
-        "所在完整句": display_text(r.get("sentence")) or "—",
+        "命中句与上下文（约50字）": _snippet(r),
+        "完整语境段落": display_text(r.get("passage")) or display_text(r.get("sentence")) or "—",
         "出处": (r.get("source_document") or "未定位") +
               (f" · 第 {r['source_line']} 行" if r.get("source_line") else ""),
         "出处状态": r.get("source_status", ""),
@@ -166,14 +187,14 @@ def write_page(query, records, total, corpus, command, truncated=False):
     html_doc = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>BCC 全部检索结果 · {html.escape(query)}</title>
 <style>
-:root{{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}}body{{margin:0;background:#f5f7fb;color:#162033}}header{{padding:26px max(24px,calc((100vw - 1500px)/2));background:linear-gradient(120deg,#09203f,#335c9b);color:#fff}}h1{{margin:0 0 8px;font-size:25px}}.meta{{opacity:.9;font-size:14px}}main{{max-width:1500px;margin:20px auto;padding:0 20px}}.notice{{background:#eaf2ff;border-left:4px solid #3377d7;padding:12px 14px;border-radius:5px;margin:12px 0 16px}}.bar{{display:flex;gap:10px;flex-wrap:wrap;align-items:center}}#filter{{width:min(440px,100%);padding:11px 13px;border:1px solid #b6c2d1;border-radius:8px;font-size:14px;background:#fff}}button{{border:1px solid #b6c2d1;background:#fff;border-radius:7px;padding:9px 11px;cursor:pointer;color:#203a5c;font-size:13px}}button:hover{{background:#eaf2ff}}.count{{margin:11px 0;color:#526071;font-size:13px}}.table-wrap{{background:#fff;border:1px solid #dce3ec;border-radius:9px;overflow:auto;box-shadow:0 1px 4px #18233d12}}table{{border-collapse:collapse;width:100%;min-width:1050px;font-size:14px}}th{{position:sticky;top:0;background:#edf3fa;color:#263b55;text-align:left;padding:11px;border-bottom:1px solid #ccd7e3;cursor:pointer;white-space:nowrap}}td{{padding:11px;border-bottom:1px solid #e6ebf1;vertical-align:top;line-height:1.65}}tr:hover{{background:#f4f8ff}}td:first-child{{color:#718096;width:42px;text-align:right}}.kwic{{min-width:350px;max-width:540px}}.sentence{{min-width:300px;max-width:500px}}mark{{background:#ffe083;color:#7d4200;padding:1px 2px;border-radius:2px;font-weight:700}}small{{display:block;color:#718096;margin-top:4px}}.pager{{display:flex;align-items:center;gap:8px;margin:14px 0 4px}}.pager button:disabled{{opacity:.45;cursor:not-allowed}}footer{{color:#788596;font-size:12px;padding:16px 0 30px}}
+:root{{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}}body{{margin:0;background:#f5f7fb;color:#162033}}header{{padding:26px max(24px,calc((100vw - 1300px)/2));background:linear-gradient(120deg,#09203f,#335c9b);color:#fff}}h1{{margin:0 0 8px;font-size:25px}}.meta{{opacity:.9;font-size:14px}}main{{max-width:1300px;margin:20px auto;padding:0 20px}}.notice{{background:#eaf2ff;border-left:4px solid #3377d7;padding:12px 14px;border-radius:5px;margin:12px 0 16px}}.bar{{display:flex;gap:10px;flex-wrap:wrap;align-items:center}}#filter{{width:min(440px,100%);padding:11px 13px;border:1px solid #b6c2d1;border-radius:8px;font-size:14px;background:#fff}}button{{border:1px solid #b6c2d1;background:#fff;border-radius:7px;padding:9px 11px;cursor:pointer;color:#203a5c;font-size:13px}}button:hover{{background:#eaf2ff}}button.detail{{white-space:nowrap;background:#f4f8ff}}.count{{margin:11px 0;color:#526071;font-size:13px}}.table-wrap{{background:#fff;border:1px solid #dce3ec;border-radius:9px;overflow:auto;box-shadow:0 1px 4px #18233d12}}table{{border-collapse:collapse;width:100%;min-width:820px;font-size:14px}}th{{position:sticky;top:0;background:#edf3fa;color:#263b55;text-align:left;padding:11px;border-bottom:1px solid #ccd7e3;cursor:pointer;white-space:nowrap}}td{{padding:11px;border-bottom:1px solid #e6ebf1;vertical-align:top;line-height:1.65}}tr:hover{{background:#f4f8ff}}td:first-child{{color:#718096;width:42px;text-align:right}}.sentence{{min-width:500px;max-width:720px}}mark{{background:#ffe083;color:#7d4200;padding:1px 2px;border-radius:2px;font-weight:700}}small{{display:block;color:#718096;margin-top:4px}}.pager{{display:flex;align-items:center;gap:8px;margin:14px 0 4px}}.pager button:disabled{{opacity:.45;cursor:not-allowed}}footer{{color:#788596;font-size:12px;padding:16px 0 30px}}dialog{{border:0;border-radius:12px;box-shadow:0 18px 60px #0005;width:min(780px,calc(100vw - 40px));padding:0}}dialog::backdrop{{background:#10233c99}}.dialog-head{{background:#edf3fa;padding:15px 18px;font-weight:700;display:flex;justify-content:space-between;align-items:center}}.dialog-body{{padding:18px;white-space:pre-wrap;line-height:1.9;max-height:65vh;overflow:auto}}.dialog-meta{{color:#62758a;font-size:13px;margin:0 0 12px}}.close{{font-size:18px;padding:3px 9px}}
 </style></head><body><header><h1>📚 BCC 全部检索结果</h1><div class="meta">检索式：<b>{html.escape(query)}</b>　·　检索类型：{html.escape(command)}　·　命中：<b>{total}</b>　·　{time.strftime('%Y-%m-%d %H:%M')}</div></header>
-<main><div class="notice">{html.escape(note)} 每条记录包含 KWIC 上下文、所在完整句与语料文件出处；出处由引擎返回或在本机原始语料中回查定位。此页面为临时文件：下一次查询时或 24 小时后自动清理；点击导出下载的文件会保留。</div>
-<div class="bar"><input id="filter" autofocus placeholder="🔍 筛选关键词、例句或出处…" oninput="applyFilter()"><button onclick="exportCSV()">导出 CSV（Excel 可打开）</button><button onclick="exportHTML()">导出 HTML</button></div><div id="count" class="count"></div>
-<div class="table-wrap"><table id="results"><thead><tr><th onclick="sortTable(0)"># ↕</th><th onclick="sortTable(1)">关键词与上下文 ↕</th><th onclick="sortTable(2)">所在完整句 ↕</th><th onclick="sortTable(3)">出处 ↕</th></tr></thead><tbody>{_context_table(records)}</tbody></table></div><div class="pager"><button id="prev" onclick="go(-1)">← 上一页</button><span id="pageInfo"></span><button id="next" onclick="go(1)">下一页 →</button></div>
-<footer>数据仅来自当前本机 BCC 语料库。无法可靠定位出处的记录会明确标注“未定位”，请以 KWIC 内容为准。</footer></main>
+<main><div class="notice">{html.escape(note)} 列表只展示命中句及查询目标前后共约 50 字；黄色高亮为查询目标。点击“查看完整段落”可展开命中句前后连续语境。出处由引擎返回或在本机原始语料中回查定位。此页面为临时文件：下一次查询时或 24 小时后自动清理；点击导出下载的文件会保留。</div>
+<div class="bar"><input id="filter" autofocus placeholder="🔍 筛选命中句或出处…" oninput="applyFilter()"><button onclick="exportCSV()">导出 CSV（Excel 可打开）</button><button onclick="exportHTML()">导出 HTML</button></div><div id="count" class="count"></div>
+<div class="table-wrap"><table id="results"><thead><tr><th onclick="sortTable(0)"># ↕</th><th onclick="sortTable(1)">命中句与上下文（约 50 字）↕</th><th onclick="sortTable(2)">出处 ↕</th><th>详情</th></tr></thead><tbody>{_context_table(records)}</tbody></table></div><div class="pager"><button id="prev" onclick="go(-1)">← 上一页</button><span id="pageInfo"></span><button id="next" onclick="go(1)">下一页 →</button></div>
+<footer>发布语料已按句切分，完整段落以命中句前后连续 3 句组成的语境段落展示。无法可靠定位出处的记录会明确标注“未定位”。</footer></main><dialog id="passageDialog"><div class="dialog-head"><span>完整语境段落</span><button class="close" onclick="passageDialog.close()">×</button></div><div class="dialog-body"><p id="dialogMeta" class="dialog-meta"></p><div id="dialogText"></div></div></dialog>
 <script id="exportData" type="application/json">{data_json}</script><script>
-const pageSize={PAGE_SIZE};let page=1,sortAsc=true;const rows=[...document.querySelectorAll('#results tbody tr')];const data=JSON.parse(document.getElementById('exportData').textContent);let filtered=rows;
+const pageSize={PAGE_SIZE};let page=1,sortAsc=true;const rows=[...document.querySelectorAll('#results tbody tr')];const data=JSON.parse(document.getElementById('exportData').textContent);let filtered=rows;const passageDialog=document.getElementById('passageDialog');
 function render(){{const pages=Math.max(1,Math.ceil(filtered.length/pageSize));page=Math.min(page,pages);rows.forEach(r=>r.style.display='none');filtered.slice((page-1)*pageSize,page*pageSize).forEach(r=>r.style.display='');document.getElementById('count').textContent=`筛选后 ${{filtered.length}} 条 · 每页 ${{pageSize}} 条`;document.getElementById('pageInfo').textContent=`第 ${{page}} / ${{pages}} 页`;document.getElementById('prev').disabled=page<=1;document.getElementById('next').disabled=page>=pages;}}
 function applyFilter(){{const q=document.getElementById('filter').value.toLowerCase();filtered=rows.filter(r=>!q||r.innerText.toLowerCase().includes(q));page=1;render();}}
 function go(n){{page+=n;render();}}
@@ -181,10 +202,11 @@ function sortTable(c){{rows.sort((a,b)=>{{const x=a.cells[c].innerText,y=b.cells
 function activeData(){{const q=document.getElementById('filter').value.toLowerCase();return data.filter(x=>!q||Object.values(x).join(' ').toLowerCase().includes(q));}}
 function download(name,type,content){{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{{type}}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{{URL.revokeObjectURL(a.href);a.remove()}},1000);}}
 function stamp(){{return new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');}}
+function showPassage(index){{const item=data[index];document.getElementById('dialogMeta').textContent=`${{item['出处']}} · ${{item['出处状态']}}`;const keyword=item['关键词'];const parts=esc(item['完整语境段落']).split(esc(keyword));document.getElementById('dialogText').innerHTML=parts.join('<mark>'+esc(keyword)+'</mark>');passageDialog.showModal();}}
 function csvCell(v){{return '"'+String(v??'').replaceAll('"','""')+'"';}}
-function exportCSV(){{const items=activeData(),heads=['序号','关键词','左上下文','右上下文','所在完整句','出处','出处状态'];const csv='\\uFEFF'+[heads,...items.map(x=>heads.map(h=>x[h]))].map(r=>r.map(csvCell).join(',')).join('\\r\\n');download(`BCC检索结果-${{stamp()}}.csv`,'text/csv;charset=utf-8',csv);}}
+function exportCSV(){{const items=activeData(),heads=['序号','关键词','命中句与上下文（约50字）','完整语境段落','出处','出处状态'];const csv='\\uFEFF'+[heads,...items.map(x=>heads.map(h=>x[h]))].map(r=>r.map(csvCell).join(',')).join('\\r\\n');download(`BCC检索结果-${{stamp()}}.csv`,'text/csv;charset=utf-8',csv);}}
 function esc(v){{return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');}}
-function exportHTML(){{const items=activeData(),heads=['序号','关键词','左上下文','右上下文','所在完整句','出处','出处状态'];const body=items.map(x=>'<tr>'+heads.map(h=>'<td>'+esc(x[h])+'</td>').join('')+'</tr>').join('');const doc='<!doctype html><meta charset="utf-8"><title>BCC 检索结果</title><style>body{{font-family:system-ui,"PingFang SC";margin:24px}}table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #ccc;padding:7px;text-align:left;vertical-align:top}}th{{background:#eef3f8}}</style><h1>BCC 检索结果</h1><p>检索式：'+esc({json.dumps(query, ensure_ascii=False)})+'；导出条数：'+items.length+'</p><table><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr>'+body+'</table>';download(`BCC检索结果-${{stamp()}}.html`,'text/html;charset=utf-8',doc);}}
+function exportHTML(){{const items=activeData(),heads=['序号','关键词','命中句与上下文（约50字）','完整语境段落','出处','出处状态'];const body=items.map(x=>'<tr>'+heads.map(h=>'<td>'+esc(x[h])+'</td>').join('')+'</tr>').join('');const doc='<!doctype html><meta charset="utf-8"><title>BCC 检索结果</title><style>body{{font-family:system-ui,"PingFang SC";margin:24px}}table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #ccc;padding:7px;text-align:left;vertical-align:top}}th{{background:#eef3f8}}</style><h1>BCC 检索结果</h1><p>检索式：'+esc({json.dumps(query, ensure_ascii=False)})+'；导出条数：'+items.length+'</p><table><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr>'+body+'</table>';download(`BCC检索结果-${{stamp()}}.html`,'text/html;charset=utf-8',doc);}}
 render();
 </script></body></html>"""
     with open(path, "w", encoding="utf-8") as out:

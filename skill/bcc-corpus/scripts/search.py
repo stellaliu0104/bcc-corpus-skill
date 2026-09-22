@@ -424,7 +424,7 @@ def main():
                 })
             out["results_pages"] = pages
             out["results_page_note"] = (
-                "已生成全部命中结果页并尝试在浏览器打开；页面含 KWIC、所在完整句、语料出处、分页与页面内导出。"
+                "已生成全部命中结果页并尝试在浏览器打开；列表含高亮命中句与约50字上下文，点击可查看完整语境段落、出处、分页与页面内导出。"
             )
             out["temporary_pages_cleaned"] = cleaned
         except Exception as e:  # noqa: BLE001
