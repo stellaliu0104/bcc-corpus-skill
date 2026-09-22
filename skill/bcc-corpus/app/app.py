@@ -53,78 +53,53 @@ def sidebar():
     st.sidebar.subheader("🔑 API 设置")
     settings = llm_client.load_settings()
 
-    providers = ["openai-compatible", "claude", "aicore"]
-    cur_provider = settings.get("provider", "openai-compatible")
+    providers = ["deepseek", "glm", "openai-compatible", "claude"]
+    cur_provider = settings.get("provider", "deepseek")
     provider_idx = providers.index(cur_provider) if cur_provider in providers else 0
-    provider = st.sidebar.selectbox("模型提供方", providers, index=provider_idx,
-                                    help="openai-compatible = 硅基流动/阿里百炼/智谱等国内平台；claude = 直连 Anthropic；aicore = SAP AI Core")
+    provider = st.sidebar.selectbox(
+        "模型提供方", providers, index=provider_idx,
+        format_func={
+            "deepseek": "DeepSeek",
+            "glm": "智谱 GLM",
+            "openai-compatible": "自定义 OpenAI 兼容接口",
+            "claude": "Anthropic Claude",
+        }.get,
+        help="DeepSeek 和 GLM 使用官方 OpenAI 兼容接口；自定义接口可连接其他兼容服务商。",
+    )
 
     cfg = {"provider": provider}
+    openai_defaults = {
+        "deepseek": ("https://api.deepseek.com", "deepseek-chat", "DeepSeek 平台创建的 API Key，仅存本地"),
+        "glm": ("https://open.bigmodel.cn/api/paas/v4/", "glm-5.3", "智谱开放平台创建的 API Key，仅存本地"),
+        "openai-compatible": ("", "", "兼容 OpenAI Chat Completions 的服务商 API Key，仅存本地"),
+    }
 
-    if provider == "aicore":
-        # 凭证全从 AI/.env 读取，不在前端展示
-        cfg["aicore_auth_url"] = os.environ.get("AICORE_AUTH_URL", "")
-        cfg["aicore_client_id"] = os.environ.get("AICORE_CLIENT_ID", "")
-        cfg["aicore_client_secret"] = os.environ.get("AICORE_CLIENT_SECRET", "")
-        cfg["base_url"] = os.environ.get("AICORE_BASE_URL", "")
-        cfg["aicore_resource_group"] = os.environ.get("AICORE_RESOURCE_GROUP", "default")
-        cfg["api_key"] = ""
-
-        # 模型列表：session_state 缓存，按钮刷新
-        if "aicore_models" not in st.session_state:
-            st.session_state["aicore_models"] = []
-        if st.sidebar.button("🔄 刷新可用模型"):
-            try:
-                from core.aicore_client import AICoreClient
-                _c = AICoreClient(
-                    auth_url=cfg["aicore_auth_url"],
-                    base_url=cfg["base_url"],
-                    client_id=cfg["aicore_client_id"],
-                    client_secret=cfg["aicore_client_secret"],
-                    resource_group=cfg["aicore_resource_group"],
-                )
-                st.session_state["aicore_models"] = _c.list_models()
-                st.sidebar.success(f"获取到 {len(st.session_state['aicore_models'])} 个模型")
-            except Exception as e:
-                st.sidebar.error(f"刷新失败: {e}")
-
-        models_list = st.session_state["aicore_models"]
-        saved_model = settings.get("model", llm_client.AICORE_DEFAULT_MODEL)
-        if models_list:
-            idx = models_list.index(saved_model) if saved_model in models_list else 0
-            cfg["model"] = st.sidebar.selectbox("模型", models_list, index=idx)
-        else:
-            cfg["model"] = st.sidebar.text_input(
-                "模型名称", value=saved_model,
-                help="点击「刷新可用模型」可从 AI Core 拉取列表")
-    elif provider == "openai-compatible":
+    if provider in openai_defaults:
+        default_url, default_model, key_help = openai_defaults[provider]
+        use_saved = settings.get("provider") == provider
         cfg["api_key"] = st.sidebar.text_input(
-            "API Key", value=settings.get("api_key", ""),
-            type="password", help="从硅基流动/阿里百炼/智谱等平台获取的 Key，仅存本地")
-        cfg["base_url"] = st.sidebar.text_input(
-            "Base URL", value=settings.get("base_url", "https://api.siliconflow.cn/v1"),
-            help="各平台的 API 地址，如 https://api.siliconflow.cn/v1")
+            "API Key", value=settings.get("api_key", "") if use_saved else "",
+            type="password", help=key_help)
+        if provider == "openai-compatible":
+            cfg["base_url"] = st.sidebar.text_input(
+                "Base URL", value=settings.get("base_url", "") if use_saved else "",
+                placeholder="例如 https://api.example.com/v1",
+                help="服务商的 OpenAI Chat Completions 兼容 API 地址")
+        else:
+            cfg["base_url"] = default_url
+            st.sidebar.caption(f"Base URL：`{default_url}`")
         cfg["model"] = st.sidebar.text_input(
-            "模型名", value=settings.get("model", ""),
-            placeholder="从平台「模型广场」复制免费模型名",
-            help="去平台「模型广场」找标注「免费」的模型，复制名称粘贴到这里")
-        cfg["aicore_auth_url"] = ""
-        cfg["aicore_client_id"] = ""
-        cfg["aicore_client_secret"] = ""
-        cfg["aicore_resource_group"] = "default"
+            "模型名", value=settings.get("model", default_model) if use_saved else default_model,
+            help="可按服务商文档改为你有权限调用的模型名称")
     else:
         cfg["api_key"] = st.sidebar.text_input(
             "API Key", value=settings.get("api_key", ""),
-            type="password", help="你自己的 Anthropic key,仅存本地")
+            type="password", help="你自己的 Anthropic Key，仅存本地")
         cfg["model"] = st.sidebar.text_input(
             "模型", value=settings.get("model", llm_client.DEFAULT_MODEL))
         cfg["base_url"] = st.sidebar.text_input(
-            "Base URL(可选,走代理时填)", value=settings.get("base_url", ""),
-            help="留空走官方 API;走本地代理时填,如 http://localhost:6655/anthropic")
-        cfg["aicore_auth_url"] = ""
-        cfg["aicore_client_id"] = ""
-        cfg["aicore_client_secret"] = ""
-        cfg["aicore_resource_group"] = "default"
+            "Base URL（可选，走代理时填）", value=settings.get("base_url", ""),
+            help="留空走官方 API；走本地代理时填，例如 http://localhost:6655/anthropic")
 
     if st.sidebar.button("💾 保存设置"):
         llm_client.save_settings(cfg)
@@ -205,12 +180,8 @@ def _llm_from_cfg(cfg):
     return llm_client.LLMClient(
         api_key=cfg.get("api_key", ""),
         model=cfg.get("model"),
-        provider=cfg.get("provider", "claude"),
+        provider=cfg.get("provider", "deepseek"),
         base_url=cfg.get("base_url", ""),
-        aicore_auth_url=cfg.get("aicore_auth_url", ""),
-        aicore_client_id=cfg.get("aicore_client_id", ""),
-        aicore_client_secret=cfg.get("aicore_client_secret", ""),
-        aicore_resource_group=cfg.get("aicore_resource_group", "default"),
     )
 
 
@@ -228,11 +199,8 @@ def tab_ai(cfg):
     st.header("🤖 AI 分析")
     st.markdown("用**中文**描述你想查什么,AI 帮你生成检索式,再检索,再解读。")
 
-    if not cfg.get("api_key") and cfg.get("provider", "openai-compatible") in ("claude", "openai-compatible"):
+    if not cfg.get("api_key"):
         st.warning("请先在左侧填入 API Key 并保存。")
-        return
-    if cfg.get("provider") == "aicore" and not cfg.get("aicore_client_id"):
-        st.warning("请先在左侧填入 AI Core 凭证并保存。")
         return
 
     question = st.text_area("你的研究问题", key="ai_question",

@@ -62,6 +62,16 @@ def main():
             n += 1
     print(f"语料就位: {n} 个文件")
 
+    version_path = os.path.join(SKILL, "VERSION")
+    if not os.path.isfile(version_path):
+        print("缺少 skill/bcc-corpus/VERSION；请先写入本次发行版本号")
+        sys.exit(1)
+    with open(version_path, encoding="utf-8") as f:
+        version = f.read().strip()
+    if not version:
+        print("VERSION 不能为空")
+        sys.exit(1)
+
     zip_path = os.path.join(REPO, "skill", "bcc-corpus.zip")
     entries = 0
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
@@ -76,8 +86,9 @@ def main():
                 z.write(full, arc)  # 名字含非 ASCII 时 zipfile 自动置 UTF-8 标志
                 entries += 1
     size = os.path.getsize(zip_path) / 1024 / 1024
-    print(f"打包完成: skill/bcc-corpus.zip ({entries} 个条目, {size:.1f}M)")
-    print("发给师门后: WorkBuddy 设置 → 技能 → 上传技能 → 拖入 zip")
+    print(f"打包完成: skill/bcc-corpus.zip ({entries} 个条目, {size:.1f}M, v{version})")
+    print("首次安装: WorkBuddy 设置 → 技能 → 上传技能 → 拖入 zip")
+    print(f"升级发布: 创建 GitHub Release v{version}，并上传此文件且附件名保持 bcc-corpus.zip")
 
 
 if __name__ == "__main__":

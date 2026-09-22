@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """LLM 接口抽象层。
 
-支持三种 provider:
-  claude   — 直连 Anthropic API
-  aicore   — SAP AI Core
-  openai-compatible — 任意兼容 OpenAI Chat Completions 的接口(硅基流动、阿里百炼、智谱等)
+支持四种 provider:
+  claude            — 直连 Anthropic API
+  deepseek / glm    — 官方 OpenAI Chat Completions 兼容接口
+  openai-compatible — 任意兼容 OpenAI Chat Completions 的接口
 统一提供 chat() 方法;阶段二的 agent 用 chat_with_tools() 走 tool-use 循环。
 """
 
@@ -13,7 +13,8 @@ import json
 
 
 DEFAULT_MODEL = "claude-opus-4-8"
-AICORE_DEFAULT_MODEL = "anthropic--claude-4.8-opus"
+DEEPSEEK_DEFAULT_MODEL = "deepseek-chat"
+GLM_DEFAULT_MODEL = "glm-5.3"
 OPENAI_COMPAT_DEFAULT_MODEL = ""
 
 # 启动时尝试加载 AI/.env(开发机便捷配置,分发包里不存在则忽略)
@@ -30,25 +31,23 @@ _load_dotenv()
 
 
 class LLMClient:
-    """LLM 客户端封装。支持 claude / aicore / openai-compatible 三种 provider。"""
+    """LLM 客户端封装。支持 Claude 及 OpenAI Chat Completions 兼容接口。"""
 
-    def __init__(self, api_key=None, model=None, provider="claude", base_url="",
-                 aicore_auth_url="", aicore_client_id="", aicore_client_secret="",
-                 aicore_resource_group="default"):
+    def __init__(self, api_key=None, model=None, provider="claude", base_url=""):
         self.provider = provider
-        self.base_url = base_url
+        provider_defaults = {
+            "deepseek": ("https://api.deepseek.com", DEEPSEEK_DEFAULT_MODEL, "DEEPSEEK_API_KEY"),
+            "glm": ("https://open.bigmodel.cn/api/paas/v4/", GLM_DEFAULT_MODEL, "ZAI_API_KEY"),
+            "openai-compatible": ("", OPENAI_COMPAT_DEFAULT_MODEL, "OPENAI_API_KEY"),
+        }
 
-        if provider == "aicore":
-            self.model = model or AICORE_DEFAULT_MODEL
-            self._aicore_auth_url = aicore_auth_url or os.environ.get("AICORE_AUTH_URL", "")
-            self._aicore_base_url = base_url or os.environ.get("AICORE_BASE_URL", "")
-            self._aicore_client_id = aicore_client_id or os.environ.get("AICORE_CLIENT_ID", "")
-            self._aicore_client_secret = aicore_client_secret or os.environ.get("AICORE_CLIENT_SECRET", "")
-            self._aicore_resource_group = aicore_resource_group or os.environ.get("AICORE_RESOURCE_GROUP", "default")
-        elif provider == "openai-compatible":
-            self.model = model or OPENAI_COMPAT_DEFAULT_MODEL
-            self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
+        if provider in provider_defaults:
+            default_url, default_model, env_key = provider_defaults[provider]
+            self.base_url = base_url or default_url
+            self.model = model or default_model
+            self.api_key = api_key or os.environ.get(env_key, "")
         else:
+            self.base_url = base_url
             self.model = model or DEFAULT_MODEL
             self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
 
@@ -63,16 +62,7 @@ class LLMClient:
                 if self.base_url:
                     kwargs["base_url"] = self.base_url
                 self._client = Anthropic(**kwargs)
-            elif self.provider == "aicore":
-                from core.aicore_client import AICoreClient
-                self._client = AICoreClient(
-                    auth_url=self._aicore_auth_url,
-                    base_url=self._aicore_base_url,
-                    client_id=self._aicore_client_id,
-                    client_secret=self._aicore_client_secret,
-                    resource_group=self._aicore_resource_group,
-                )
-            elif self.provider == "openai-compatible":
+            elif self.provider in ("deepseek", "glm", "openai-compatible"):
                 from openai import OpenAI
                 self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
             else:
@@ -90,15 +80,7 @@ class LLMClient:
                 messages=[{"role": "user", "content": user}],
             )
             return "".join(b.text for b in resp.content if b.type == "text")
-        if self.provider == "aicore":
-            return self.client.chat(
-                system=system,
-                user=user,
-                model=self.model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
-        if self.provider == "openai-compatible":
+        if self.provider in ("deepseek", "glm", "openai-compatible"):
             resp = self.client.chat.completions.create(
                 model=self.model,
                 max_tokens=max_tokens,
@@ -138,10 +120,10 @@ def load_settings():
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     return {
-        "provider": "openai-compatible",
+        "provider": "deepseek",
         "api_key": "",
-        "model": OPENAI_COMPAT_DEFAULT_MODEL,
-        "base_url": "",
+        "model": DEEPSEEK_DEFAULT_MODEL,
+        "base_url": "https://api.deepseek.com",
     }
 
 
@@ -155,14 +137,10 @@ def save_settings(settings):
 
 def client_from_settings():
     s = load_settings()
-    provider = s.get("provider", "claude")
+    provider = s.get("provider", "deepseek")
     return LLMClient(
         api_key=s.get("api_key"),
         model=s.get("model"),
         provider=provider,
         base_url=s.get("base_url", ""),
-        aicore_auth_url=s.get("aicore_auth_url", ""),
-        aicore_client_id=s.get("aicore_client_id", ""),
-        aicore_client_secret=s.get("aicore_client_secret", ""),
-        aicore_resource_group=s.get("aicore_resource_group", "default"),
     )
